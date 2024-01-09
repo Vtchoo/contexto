@@ -20,7 +20,7 @@ async function setupCommands() {
         const rest = new REST().setToken(env.TOKEN)
 
         await rest.put(Routes.applicationCommands(env.CLIENT_ID), { body: commandDefinitions })
-        console.log(`Commands set up successfully! Bon apetit`)
+        console.log(`Commands set up successfully!`)
     } catch (error) {
         console.log(`Error while setting up the bot commands. ${error.message}`, error)
     }
