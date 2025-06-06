@@ -23,13 +23,14 @@ class MainCommand implements ICommand {
 
         const playerId = interaction.user.id
 
-        const [game, justStarted] = gameManager.getOrStartGame(playerId)
+        const [game, justStarted] = gameManager.getCurrentOrCreateGame(playerId)
 
         if (game.finished) {
             await interaction.reply({
                 content: `O jogo ${game.id} já foi finalizado. Você pode jogar novamente com o comando /c <palavra>`,
                 ephemeral: true,
             })
+            gameManager.leaveCurrentGame(playerId)
             return
         }
 
@@ -62,7 +63,7 @@ class MainCommand implements ICommand {
                     return
                 }
 
-                const closestGuesses = game.getClosestGuesses()
+                const closestGuesses = game.getClosestGuesses(playerId)
                 if (closestGuesses.length > 0) {
                     const guessesFormatting = [result, ...closestGuesses].map(guess => ({
                         text: guess.word,
@@ -81,7 +82,19 @@ class MainCommand implements ICommand {
                         const barFill = '█'.repeat(Math.max(barWidth - guess.text.length, 0))
                         const remainingWidth = TOTAL_BAR_WIDTH - Math.max(barWidth, guess.text.length)
                         const remainingBar = '-'.repeat(remainingWidth)
+
+                        // color only the length of the word that fits in the bar
+                        // text inside the bar: white background, colored text
+                        // text outside the bar: no background, white text
+                        const textWithinBar = guess.text.slice(0, barWidth)
+                        const textOutsideBar = guess.text.slice(barWidth)
+                        // if the text is longer than the bar, color only the part that fits
+                        const coloredText = textWithinBar.length > 0 ? `${convertColorToAnsi(guess.color)}${textWithinBar}` : ''
+                        // if the text is longer than the bar, color only the part that fits
+                        const remainingText = textOutsideBar.length > 0 ? `${textOutsideBar}` : ''
+
                         return `[${convertColorToAnsi(guess.color)}${guess.text}${barFill}\u001b[0m${remainingBar}] ${(guess.distance || 0) + 1}${i === 0 ? '\n' : ''}`
+                        // return `[${convertColorToAnsi(guess.color)}${coloredText}\u001b[0m${remainingText}${convertColorToAnsi(guess.color)}${barFill}\u001b[0m${remainingBar}] ${(guess.distance || 0) + 1}${i === 0 ? '\n' : ''}`
                     })
 
                     let finishedGameText = ''
