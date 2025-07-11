@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios'
 import GameApi from './gameApi'
-import { getTodaysGameId } from './utils/misc'
+import { getTodaysGameId, nextTipDistance, halfTipDistance, randomTipDistance } from './utils/misc'
 import { v4 as uuid } from 'uuid'
 import { GameWord, Guess, IGame, PlayerScore } from './interface'
 import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
@@ -198,6 +198,31 @@ class ContextoManager {
         const today = new Date()
         const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
         return getTodaysGameId() - diffDays
+    }
+
+    public async getCachedWordByDistance(gameId: number, distance: number): Promise<GameWord | undefined> {
+        // Check database for any word at this exact distance
+        const repository = getCachedWordsRepository()
+        const cachedWord = await repository.findOne({
+            where: { gameId, distance }
+        })
+
+        if (cachedWord && !cachedWord.error) {
+            const result: GameWord = {
+                word: cachedWord.word,
+                lemma: cachedWord.lemma,
+                distance: cachedWord.distance,
+                error: cachedWord.error
+            }
+            
+            // Store in memory cache for faster subsequent access
+            const cacheKey = `${gameId}-${cachedWord.word.toLowerCase()}`
+            this.memoryCache.set(cacheKey, result)
+            
+            return result
+        }
+
+        return undefined
     }
 }
 
@@ -398,6 +423,225 @@ class ContextoDefaultGame implements IGame {
     getGuessCount(playerId?: string): number {
         // In default games, all players share the same guess count
         return this.guesses.filter(guess => !guess.error).length
+    }
+
+    // Get the number of players in the game
+    getPlayerCount(): number {
+        return this.players.length
+    }
+
+    // Check if the game allows tips
+    canUseTips(): boolean {
+        return this.allowTips
+    }
+
+    // Check if the game allows giving up
+    canGiveUp(): boolean {
+        return this.allowGiveUp
+    }
+
+    // Get a tip for the game
+    async getTip(playerId: string): Promise<{ word: string; distance: number; error?: string }> {
+        if (!this.canUseTips()) {
+            throw new Error("Tips are not allowed in this game")
+        }
+
+        if (!this.players.includes(playerId)) {
+            throw new Error(`Player ${playerId} is not in the game`)
+        }
+
+        if (this.finished) {
+            throw new Error("Game is already finished")
+        }
+
+        try {
+            // Convert guesses to the format expected by tip functions
+            const guessHistory = this.guesses
+                .filter(guess => !guess.error && guess.distance !== undefined)
+                .map(guess => [guess.word, guess.distance])
+
+            // Calculate tip distance using the game's easy difficulty rule (default)
+            const tipDist = halfTipDistance(guessHistory)
+            
+            // First, check if we already have a word at this exact distance in cache
+            const cachedWordAtDistance = await this.manager.getCachedWordByDistance(this.gameId, tipDist)
+            
+            if (cachedWordAtDistance) {
+                // Use the existing cached word at this distance as the tip
+                const tipGuess: Guess = {
+                    word: cachedWordAtDistance.word,
+                    lemma: cachedWordAtDistance.lemma || cachedWordAtDistance.word,
+                    distance: cachedWordAtDistance.distance!,
+                    addedBy: playerId
+                }
+                this.addGuess(playerId, tipGuess)
+                
+                return {
+                    word: cachedWordAtDistance.word,
+                    distance: cachedWordAtDistance.distance!
+                }
+            }
+            
+            // If no cached word at this distance, fetch from API
+            const { data } = await this.gameApi.tip(tipDist)
+            
+            // Add the tip word as a guess so it appears in the player's list
+            const tipGuess: Guess = {
+                word: data.word,
+                lemma: data.lemma || data.word,
+                distance: data.distance,
+                addedBy: playerId
+            }
+            this.addGuess(playerId, tipGuess)
+            
+            // Cache the new tip word normally (it will be stored with its actual word as key)
+            await this.manager.cacheWord(this.gameId, {
+                word: data.word,
+                lemma: data.lemma,
+                distance: data.distance
+            })
+            
+            return {
+                word: data.word,
+                distance: data.distance
+            }
+        } catch (error) {
+            return {
+                word: "",
+                distance: -1,
+                error: "Não foi possível obter uma dica no momento"
+            }
+        }
+    }
+
+    // Get a tip with specified difficulty level
+    async getTipWithDifficulty(playerId: string, difficulty: 'easy' | 'medium' | 'hard' = 'easy'): Promise<{ word: string; distance: number; error?: string }> {
+        if (!this.canUseTips()) {
+            throw new Error("Tips are not allowed in this game")
+        }
+
+        if (!this.players.includes(playerId)) {
+            throw new Error(`Player ${playerId} is not in the game`)
+        }
+
+        if (this.finished) {
+            throw new Error("Game is already finished")
+        }
+
+        try {
+            // Convert guesses to the format expected by tip functions
+            const guessHistory = this.guesses
+                .filter(guess => !guess.error && guess.distance !== undefined)
+                .map(guess => [guess.word, guess.distance])
+
+            // Calculate tip distance based on difficulty
+            let tipDist: number
+            switch (difficulty) {
+                case 'medium':
+                    tipDist = nextTipDistance(guessHistory)
+                    break
+                case 'hard':
+                    tipDist = randomTipDistance(guessHistory)
+                    break
+                case 'easy':
+                default:
+                    tipDist = halfTipDistance(guessHistory)
+                    break
+            }
+            
+            // First, check if we already have a word at this exact distance in cache
+            const cachedWordAtDistance = await this.manager.getCachedWordByDistance(this.gameId, tipDist)
+            
+            if (cachedWordAtDistance) {
+                // Use the existing cached word at this distance as the tip
+                const tipGuess: Guess = {
+                    word: cachedWordAtDistance.word,
+                    lemma: cachedWordAtDistance.lemma || cachedWordAtDistance.word,
+                    distance: cachedWordAtDistance.distance!,
+                    addedBy: playerId
+                }
+                this.addGuess(playerId, tipGuess)
+                
+                return {
+                    word: cachedWordAtDistance.word,
+                    distance: cachedWordAtDistance.distance!
+                }
+            }
+            
+            // If no cached word at this distance, fetch from API
+            const { data } = await this.gameApi.tip(tipDist)
+            
+            // Add the tip word as a guess so it appears in the player's list
+            const tipGuess: Guess = {
+                word: data.word,
+                lemma: data.lemma || data.word,
+                distance: data.distance,
+                addedBy: playerId
+            }
+            this.addGuess(playerId, tipGuess)
+            
+            // Cache the new tip word normally
+            await this.manager.cacheWord(this.gameId, {
+                word: data.word,
+                lemma: data.lemma,
+                distance: data.distance
+            })
+            
+            return {
+                word: data.word,
+                distance: data.distance
+            }
+        } catch (error) {
+            return {
+                word: "",
+                distance: -1,
+                error: "Não foi possível obter uma dica no momento"
+            }
+        }
+    }
+
+    // Get the answer by giving up
+    async giveUpAndGetAnswer(): Promise<{ word: string; error?: string }> {
+        if (!this.canGiveUp()) {
+            throw new Error("Give up is not allowed in this game")
+        }
+
+        if (this.finished) {
+            throw new Error("Game is already finished")
+        }
+
+        try {
+            // Check if we already have the answer (word with distance 0) in cache
+            const cachedAnswer = await this.manager.getCachedWordByDistance(this.gameId, 0)
+            
+            let answerWord: string
+            
+            if (cachedAnswer) {
+                // Use cached answer
+                answerWord = cachedAnswer.word
+            } else {
+                // Fetch from API and cache normally
+                const { data } = await this.gameApi.giveUp()
+                answerWord = data.word
+                
+                // Cache the answer normally (it will be stored with its actual word as key and distance 0)
+                await this.manager.cacheWord(this.gameId, {
+                    word: data.word,
+                    lemma: data.lemma,
+                    distance: 0
+                })
+            }
+            
+            this.finished = true
+            return {
+                word: answerWord
+            }
+        } catch (error) {
+            return {
+                word: "",
+                error: "Não foi possível obter a resposta no momento"
+            }
+        }
     }
 }
 
@@ -635,6 +879,153 @@ class ContextoCompetitiveGame implements IGame {
                 playerId,
                 guessCount: this.getGuessCount(playerId)
             }))
+    }
+
+    // Get the number of players in the game
+    getPlayerCount(): number {
+        return this.players.length
+    }
+
+    // Check if the game allows tips
+    canUseTips(): boolean {
+        return this.allowTips
+    }
+
+    // Check if the game allows giving up
+    canGiveUp(): boolean {
+        return this.allowGiveUp
+    }
+
+    // Get a tip for a specific player in competitive mode
+    async getTip(playerId: string): Promise<{ word: string; distance: number; error?: string }> {
+        if (!this.canUseTips()) {
+            throw new Error("Tips are not allowed in this game")
+        }
+
+        if (!this.players.includes(playerId)) {
+            throw new Error(`Player ${playerId} is not in the game`)
+        }
+
+        if (this.hasPlayerCompleted(playerId)) {
+            throw new Error(`Player ${playerId} has already found the word`)
+        }
+
+        try {
+            // Convert player's guesses to the format expected by tip functions
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            const guessHistory = playerGuesses
+                .filter(guess => !guess.error && guess.distance !== undefined)
+                .map(guess => [guess.word, guess.distance])
+
+            // Calculate tip distance using the game's easy difficulty rule (default)
+            const tipDist = halfTipDistance(guessHistory)
+            
+            // First, check if we already have a word at this exact distance in cache
+            const cachedWordAtDistance = await this.manager.getCachedWordByDistance(this.gameId, tipDist)
+            
+            if (cachedWordAtDistance) {
+                // Use the existing cached word at this distance as the tip
+                const tipGuess: Guess = {
+                    word: cachedWordAtDistance.word,
+                    lemma: cachedWordAtDistance.lemma || cachedWordAtDistance.word,
+                    distance: cachedWordAtDistance.distance!,
+                    addedBy: playerId
+                }
+                this.addGuess(playerId, tipGuess)
+                
+                return {
+                    word: cachedWordAtDistance.word,
+                    distance: cachedWordAtDistance.distance!
+                }
+            }
+            
+            // If no cached word at this distance, fetch from API
+            const { data } = await this.gameApi.tip(tipDist)
+            
+            // Add the tip word as a guess to the player's personal list
+            const tipGuess: Guess = {
+                word: data.word,
+                lemma: data.lemma || data.word, // Use lemma from API or fallback to word
+                distance: data.distance,
+                addedBy: playerId
+            }
+            this.addGuess(playerId, tipGuess)
+            
+            // Cache the new tip word normally (it will be stored with its actual word as key)
+            await this.manager.cacheWord(this.gameId, {
+                word: data.word,
+                lemma: data.lemma,
+                distance: data.distance
+            })
+            
+            return {
+                word: data.word,
+                distance: data.distance
+            }
+        } catch (error) {
+            return {
+                word: "",
+                distance: -1,
+                error: "Não foi possível obter uma dica no momento"
+            }
+        }
+    }
+
+    // Give up is not really applicable in competitive mode, but we can remove the player
+    async giveUpAndLeave(playerId: string): Promise<{ success: boolean; error?: string }> {
+        if (!this.players.includes(playerId)) {
+            throw new Error(`Player ${playerId} is not in the game`)
+        }
+
+        try {
+            this.removePlayer(playerId)
+            return { success: true }
+        } catch (error) {
+            return {
+                success: false,
+                error: "Não foi possível sair do jogo no momento"
+            }
+        }
+    }
+
+    // Get the answer without ending the game (for competitive mode)
+    async giveUpAndGetAnswer(): Promise<{ word: string; error?: string }> {
+        if (!this.canGiveUp()) {
+            throw new Error("Give up is not allowed in this game")
+        }
+
+        try {
+            // Check if we already have the answer (word with distance 0) in cache
+            const cachedAnswer = await this.manager.getCachedWordByDistance(this.gameId, 0)
+            
+            let answerWord: string
+            
+            if (cachedAnswer) {
+                // Use cached answer
+                answerWord = cachedAnswer.word
+            } else {
+                // Fetch from API and cache normally
+                const { data } = await this.gameApi.giveUp()
+                answerWord = data.word
+                
+                // Cache the answer normally (it will be stored with its actual word as key and distance 0)
+                await this.manager.cacheWord(this.gameId, {
+                    word: data.word,
+                    lemma: data.lemma,
+                    distance: 0
+                })
+            }
+            
+            // In competitive mode, don't end the game, just return the answer
+            return {
+                word: answerWord
+            }
+        } catch (error) {
+            return {
+                word: "",
+                error: "Não foi possível obter a resposta no momento"
+            }
+        }
     }
 }
 
