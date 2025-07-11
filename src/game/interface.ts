@@ -1,5 +1,3 @@
-
-
 export interface GameWord {
     word: string
     lemma?: string
@@ -27,4 +25,10 @@ export interface IGame {
     tryWord(playerId: string, word: string): Promise<GameWord>
     getClosestGuesses(playerId: string, count?: number): GameWord[]
     startGame(): void
+}
+
+export interface PlayerScore {
+    playerId: string
+    guessCount: number
+    completedAt: Date
 }

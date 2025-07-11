@@ -2,38 +2,75 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId } from './utils/misc'
 import { v4 as uuid } from 'uuid'
-import { GameWord, Guess, IGame } from './interface'
+import { GameWord, Guess, IGame, PlayerScore } from './interface'
 
 class ContextoManager {
 
-    games: Map<string, ContextoDefaultGame> = new Map()
+    private defaultGames: Map<string, ContextoDefaultGame> = new Map()
+    private competitiveGames: Map<string, ContextoCompetitiveGame> = new Map()
     private playerGames: Map<string, string> = new Map() // playerId -> gameId , used to track which game a player is currently playing
+    private gameTypes: Map<string, 'default' | 'competitive'> = new Map() // gameId -> game type
 
     private cachedWords: Map<string, GameWord> = new Map() // gameId + word -> guesses, used to cache guesses for quick access and avoid unnecessary API calls
 
-    public getCurrentOrCreateGame(playerId: string) {
+    public getCurrentOrCreateGame(playerId: string, gameType: 'default' | 'competitive' = 'default') {
         let game = this.getCurrentPlayerGame(playerId)
         let justStarted = false
         if (!game) {
-            game = this.createNewGame(playerId)
+            game = this.createNewGame(playerId, gameType)
             justStarted = true
         }
         return [game, justStarted] as const
     }
 
-    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | undefined {
+    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | ContextoCompetitiveGame | undefined {
         const gameId = this.playerGames.get(playerId)
         if (gameId) {
-            return this.games.get(gameId)
+            const gameType = this.gameTypes.get(gameId)
+            if (gameType === 'competitive') {
+                return this.competitiveGames.get(gameId)
+            } else {
+                return this.defaultGames.get(gameId)
+            }
         }
         return undefined
     }
 
-    public createNewGame(playerId: string) {
-        const game = new ContextoDefaultGame(playerId, this)
-        this.games.set(game.id, game)
-        this.playerGames.set(playerId, game.id)
-        return game
+    public createNewGame(playerId: string, gameType: 'default' | 'competitive' = 'default') {
+        if (gameType === 'competitive') {
+            const game = new ContextoCompetitiveGame(playerId, this)
+            this.competitiveGames.set(game.id, game)
+            this.playerGames.set(playerId, game.id)
+            this.gameTypes.set(game.id, 'competitive')
+            return game
+        } else {
+            const game = new ContextoDefaultGame(playerId, this)
+            this.defaultGames.set(game.id, game)
+            this.playerGames.set(playerId, game.id)
+            this.gameTypes.set(game.id, 'default')
+            return game
+        }
+    }
+
+    // Find or create a competitive game for a player to join
+    public findOrCreateCompetitiveGame(playerId: string): ContextoCompetitiveGame {
+        // Check if player is already in a competitive game
+        const currentGame = this.getCurrentPlayerGame(playerId)
+        if (currentGame && currentGame instanceof ContextoCompetitiveGame) {
+            return currentGame
+        }
+
+        // Find an existing competitive game that's still accepting players
+        for (const game of this.competitiveGames.values()) {
+            if (game.players.length < 10 && !game.hasPlayerCompleted(playerId)) { // Arbitrary max of 10 players
+                game.addPlayer(playerId)
+                this.playerGames.set(playerId, game.id)
+                return game
+            }
+        }
+
+        // Create a new competitive game
+        return this.createNewGame(playerId, 'competitive') as ContextoCompetitiveGame
     }
 
     public getCachedWord(gameId: number, word: string): GameWord | undefined {
@@ -45,6 +82,21 @@ class ContextoManager {
     }
 
     public leaveCurrentGame(playerId: string) {
+        const gameId = this.playerGames.get(playerId)
+        if (gameId) {
+            const gameType = this.gameTypes.get(gameId)
+            if (gameType === 'competitive') {
+                const game = this.competitiveGames.get(gameId)
+                if (game) {
+                    game.removePlayer(playerId)
+                }
+            } else {
+                const game = this.defaultGames.get(gameId)
+                if (game) {
+                    game.removePlayer(playerId)
+                }
+            }
+        }
         this.playerGames.delete(playerId)
     }
 }
@@ -229,6 +281,11 @@ class ContextoDefaultGame implements IGame {
             .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0)) // Sort by distance
             .slice(0, count) // Limit to the closest guesses
     }
+
+    getGuessCount(playerId?: string): number {
+        // In default games, all players share the same guess count
+        return this.guesses.filter(guess => !guess.error).length
+    }
 }
 
 class ContextoCompetitiveGame implements IGame {
@@ -236,10 +293,12 @@ class ContextoCompetitiveGame implements IGame {
     private readonly manager: ContextoManager
     private readonly gameApi: ReturnType<typeof GameApi>
 
+    public readonly id = uuid()
     gameId: number
     players: string[] = []
-    guesses: Guess[] = []
-    finished = false
+    private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
+    private playerCompletions: PlayerScore[] = [] // Track when players complete the word
+    finished = false // Always false in competitive mode
 
     allowTips = true
     allowGiveUp = true
@@ -251,6 +310,8 @@ class ContextoCompetitiveGame implements IGame {
         this.players.push(playerId)
         this.manager = manager
         this.gameApi = GameApi('pt-br', this.gameId)
+        // Initialize empty guess array for the first player
+        this.playerGuesses.set(playerId, [])
     }
 
     startGame() {
@@ -262,6 +323,8 @@ class ContextoCompetitiveGame implements IGame {
             throw new Error(`Player ${playerId} is already in the game`)
         }
         this.players.push(playerId)
+        // Initialize empty guess array for new player
+        this.playerGuesses.set(playerId, [])
     }
 
     removePlayer(playerId: string) {
@@ -270,25 +333,60 @@ class ContextoCompetitiveGame implements IGame {
             throw new Error(`Player ${playerId} is not in the game`)
         }
         this.players.splice(index, 1)
-        if (this.players.length === 0) {
-            this.finished = true
-        }
+        // Remove player's guesses and completions
+        this.playerGuesses.delete(playerId)
+        this.playerCompletions = this.playerCompletions.filter(score => score.playerId !== playerId)
+        // Note: Don't finish the game when players leave in competitive mode
     }
 
     addGuess(playerId: string, guess: Guess) {
         if (!this.players.includes(playerId)) {
             throw new Error(`Player ${playerId} is not in the game`)
         }
-        this.guesses.push(guess)
+        
+        // Get or create player's guess array
+        let playerGuesses = this.playerGuesses.get(playerId)
+        if (!playerGuesses) {
+            playerGuesses = []
+            this.playerGuesses.set(playerId, playerGuesses)
+        }
+        
+        playerGuesses.push(guess)
+    }
+
+    // Get existing guess from player's personal guesses
+    getExistingGuess(word: string, playerId: string): Guess | undefined {
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses.find(guess => guess.word === word || guess.lemma === word)
+    }
+
+    // Get player's current guess count - requires playerId context in competitive mode
+    getGuessCount(playerId: string): number {
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses.filter(guess => !guess.error).length
+    }
+
+    // Legacy getter for compatibility - avoid using this in competitive mode
+    get guessCount(): number {
+        // This is ambiguous in competitive mode, but kept for backward compatibility
+        let totalGuesses = 0
+        for (const guesses of this.playerGuesses.values()) {
+            totalGuesses += guesses.filter(guess => !guess.error).length
+        }
+        return totalGuesses
     }
 
     async tryWord(playerId: string, word: string): Promise<Guess> {
-        if (this.finished) {
-            throw new Error(`Game ${this.gameId} is already finished`)
-        }
-
+        // Note: No check for finished game in competitive mode - game runs indefinitely
+        
         if (!this.players.includes(playerId)) {
             throw new Error(`Player ${playerId} is not in the game`)
+        }
+
+        // Check if player already completed the word
+        const hasCompleted = this.playerCompletions.some(score => score.playerId === playerId)
+        if (hasCompleted) {
+            throw new Error(`Player ${playerId} has already found the word`)
         }
 
         // Check in the cached words first
@@ -311,6 +409,17 @@ class ContextoCompetitiveGame implements IGame {
                 addedBy: playerId
             }
             this.addGuess(playerId, guess)
+            
+            // Check if player found the word
+            if (cachedWord.distance === 0) {
+                const playerGuesses = this.playerGuesses.get(playerId) || []
+                this.playerCompletions.push({
+                    playerId,
+                    guessCount: playerGuesses.length,
+                    completedAt: new Date()
+                })
+            }
+            
             return guess
         }
 
@@ -324,9 +433,16 @@ class ContextoCompetitiveGame implements IGame {
             }
             this.addGuess(playerId, guess)
 
+            // Check if player found the word - don't end game, just record completion
             if (data.distance === 0) {
-                this.finished = true // Mark the game as finished if the guess is correct
+                const playerGuesses = this.playerGuesses.get(playerId) || []
+                this.playerCompletions.push({
+                    playerId,
+                    guessCount: playerGuesses.length,
+                    completedAt: new Date()
+                })
             }
+            
             // Cache the word for quick access next time
             this.manager.cacheWord(this.gameId, {
                 word: data.word,
@@ -353,15 +469,53 @@ class ContextoCompetitiveGame implements IGame {
     }
 
     getClosestGuesses(playerId: string, count?: number): GameWord[] {
-        // show only guesses made by the player
-        return this.guesses
+        // Show only guesses made by the specific player
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses
             .filter(guess => !guess.error) // Filter out invalid guesses
-            .filter(guess => guess.addedBy === playerId) // Filter by player
             .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0)) // Sort by distance
             .slice(0, count ?? 10) // Limit to the closest guesses
+    }
+
+    // Get player's guess count
+    getPlayerGuessCount(playerId: string): number {
+        return this.getGuessCount(playerId)
+    }
+
+    // Check if player has completed the word
+    hasPlayerCompleted(playerId: string): boolean {
+        return this.playerCompletions.some(score => score.playerId === playerId)
+    }
+
+    // Get player's completion info
+    getPlayerCompletion(playerId: string): PlayerScore | undefined {
+        return this.playerCompletions.find(score => score.playerId === playerId)
+    }
+
+    // Get leaderboard ranked by fewest guesses
+    getLeaderboard(): PlayerScore[] {
+        return [...this.playerCompletions]
+            .sort((a, b) => {
+                // Sort by guess count (ascending), then by completion time (ascending)
+                if (a.guessCount !== b.guessCount) {
+                    return a.guessCount - b.guessCount
+                }
+                return a.completedAt.getTime() - b.completedAt.getTime()
+            })
+    }
+
+    // Get all players who haven't completed yet with their current guess count
+    getActivePlayerStats(): Array<{ playerId: string; guessCount: number }> {
+        return this.players
+            .filter(playerId => !this.hasPlayerCompleted(playerId))
+            .map(playerId => ({
+                playerId,
+                guessCount: this.getGuessCount(playerId)
+            }))
     }
 }
 
 const gameManager = new ContextoManager()
 
 export default gameManager
+export { ContextoDefaultGame, ContextoCompetitiveGame, ContextoManager }
