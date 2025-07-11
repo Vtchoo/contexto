@@ -3,13 +3,15 @@ import { GameWord } from './interface'
 import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
 import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
+import { ContextoStopGame } from './ContextoStopGame'
 
 class ContextoManager {
 
     private defaultGames: Map<string, ContextoDefaultGame> = new Map()
     private competitiveGames: Map<string, ContextoCompetitiveGame> = new Map()
+    private stopGames: Map<string, ContextoStopGame> = new Map()
     private playerGames: Map<string, string> = new Map() // playerId -> gameId , used to track which game a player is currently playing
-    private gameTypes: Map<string, 'default' | 'competitive'> = new Map() // gameId -> game type
+    private gameTypes: Map<string, 'default' | 'competitive' | 'stop'> = new Map() // gameId -> game type
 
     private memoryCache: Map<string, GameWord> = new Map() // In-memory cache for fast access during session
 
@@ -17,6 +19,8 @@ class ContextoManager {
         let game = this.getCurrentPlayerGame(playerId)
         let justStarted = false
         if (!game) {
+            // Only allow default and competitive games through this method
+            // Stop games must be created explicitly through createNewGame
             // Always create a new private room for any game type
             game = this.createNewGame(playerId, gameType, gameIdOrDate)
             justStarted = true
@@ -24,12 +28,14 @@ class ContextoManager {
         return [game, justStarted] as const
     }
 
-    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | ContextoCompetitiveGame | undefined {
+    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | undefined {
         const gameId = this.playerGames.get(playerId)
         if (gameId) {
             const gameType = this.gameTypes.get(gameId)
             if (gameType === 'competitive') {
                 return this.competitiveGames.get(gameId)
+            } else if (gameType === 'stop') {
+                return this.stopGames.get(gameId)
             } else {
                 return this.defaultGames.get(gameId)
             }
@@ -37,13 +43,20 @@ class ContextoManager {
         return undefined
     }
 
-    public createNewGame(playerId: string, gameType: 'default' | 'competitive' = 'default', gameIdOrDate?: number | Date) {
+    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' = 'default', gameIdOrDate?: number | Date) {
         if (gameType === 'competitive') {
             // Create a new competitive game room
             const game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
             this.competitiveGames.set(game.id, game)
             this.playerGames.set(playerId, game.id)
             this.gameTypes.set(game.id, 'competitive')
+            return game
+        } else if (gameType === 'stop') {
+            // Create a new stop game room
+            const game = new ContextoStopGame(playerId, this, gameIdOrDate)
+            this.stopGames.set(game.id, game)
+            this.playerGames.set(playerId, game.id)
+            this.gameTypes.set(game.id, 'stop')
             return game
         } else {
             const game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
@@ -120,6 +133,39 @@ class ContextoManager {
         return game
     }
 
+    // Join a specific stop game by its instance ID (like a private room/lobby)
+    public joinStopGame(playerId: string, gameInstanceId: string): ContextoStopGame {
+        // Check if player is already in a stop game
+        const currentGame = this.getCurrentPlayerGame(playerId)
+        if (currentGame && currentGame instanceof ContextoStopGame) {
+            if (currentGame.id === gameInstanceId) {
+                return currentGame // Already in this game
+            }
+            throw new Error("You are already in another stop game. Use /leave first.")
+        }
+
+        // Find the specific stop game by its instance ID
+        const game = this.stopGames.get(gameInstanceId)
+        if (!game) {
+            throw new Error(`Stop game with ID ${gameInstanceId} not found`)
+        }
+
+        // Check if game has room for more players (stop games can have more players)
+        if (game.getPlayerCount() >= 20) {
+            throw new Error("This stop game is full (max 20 players)")
+        }
+
+        // Check if game is already finished
+        if (game.finished) {
+            throw new Error("This stop game has already been completed")
+        }
+
+        // Add player to the game
+        game.addPlayer(playerId)
+        this.playerGames.set(playerId, game.id)
+        return game
+    }
+
     // Get information about a competitive game room
     public getCompetitiveGameInfo(gameInstanceId: string): { game: ContextoCompetitiveGame; exists: boolean } {
         const game = this.competitiveGames.get(gameInstanceId)
@@ -132,6 +178,15 @@ class ContextoManager {
     // Get information about a cooperative game room
     public getCooperativeGameInfo(gameInstanceId: string): { game: ContextoDefaultGame; exists: boolean } {
         const game = this.defaultGames.get(gameInstanceId)
+        return {
+            game: game!,
+            exists: !!game
+        }
+    }
+
+    // Get information about a stop game room
+    public getStopGameInfo(gameInstanceId: string): { game: ContextoStopGame; exists: boolean } {
+        const game = this.stopGames.get(gameInstanceId)
         return {
             game: game!,
             exists: !!game

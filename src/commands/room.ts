@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
 
 class RoomCommand implements ICommand {
 
@@ -17,10 +17,10 @@ class RoomCommand implements ICommand {
         const playerId = interaction.user.id
         const roomId = interaction.options.getString("id")
 
-        let game: ContextoCompetitiveGame | ContextoDefaultGame | undefined
+        let game: ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | undefined
 
         if (roomId) {
-            // Check specific room ID - try competitive first, then cooperative
+            // Check specific room ID - try competitive first, then cooperative, then stop
             const competitiveInfo = gameManager.getCompetitiveGameInfo(roomId)
             if (competitiveInfo.exists) {
                 game = competitiveInfo.game
@@ -29,11 +29,16 @@ class RoomCommand implements ICommand {
                 if (cooperativeInfo.exists) {
                     game = cooperativeInfo.game
                 } else {
-                    await interaction.reply({
-                        content: `❌ Sala com ID \`${roomId}\` não encontrada.`,
-                        ephemeral: true
-                    })
-                    return
+                    const stopInfo = gameManager.getStopGameInfo(roomId)
+                    if (stopInfo.exists) {
+                        game = stopInfo.game
+                    } else {
+                        await interaction.reply({
+                            content: `❌ Sala com ID \`${roomId}\` não encontrada.`,
+                            ephemeral: true
+                        })
+                        return
+                    }
                 }
             }
         } else {
@@ -53,6 +58,8 @@ class RoomCommand implements ICommand {
             return this.showCompetitiveRoomInfo(interaction, game, roomId || undefined)
         } else if (game instanceof ContextoDefaultGame) {
             return this.showCooperativeRoomInfo(interaction, game, roomId || undefined)
+        } else if (game instanceof ContextoStopGame) {
+            return this.showStopRoomInfo(interaction, game, roomId || undefined)
         }
     }
 
@@ -114,6 +121,45 @@ class RoomCommand implements ICommand {
                 `**Desistir:** ${game.canGiveUp() ? "✅ Permitido" : "❌ Desabilitado"}` +
                 guessesText +
                 `\n\n📋 **Para convidar outros:**\n\`/join ${game.id}\``,
+            ephemeral: roomId ? true : false
+        })
+    }
+
+    private async showStopRoomInfo(interaction: any, game: ContextoStopGame, roomId?: string) {
+        const leaderboard = game.getLeaderboard()
+        const progress = game.getAllPlayersProgress()
+        
+        let progressText = ""
+        if (progress.length > 0) {
+            progressText = "\n🏆 **Ranking atual (por distância mais próxima):**\n" +
+                progress.slice(0, 5).map((player, index) => 
+                    `${index + 1}º <@${player.playerId}> - ${player.closestDistance + 1} (${player.closestWord})`
+                ).join('\n')
+        }
+
+        let statusText = ""
+        if (game.finished) {
+            const winner = game.getWinner()
+            if (winner) {
+                statusText = `🏁 **Finalizado** - Vencedor: <@${winner.playerId}> (${winner.guessCount} tentativas)`
+            } else {
+                statusText = "🏁 **Finalizado**"
+            }
+        } else {
+            statusText = "⚡ **Em andamento** - Termina quando alguém acerta!"
+        }
+
+        await interaction.reply({
+            content: 
+                `⚡ **Sala Stop**\n\n` +
+                `**ID da Sala:** \`${game.id}\`\n` +
+                `**Jogo Contexto:** #${game.gameId}\n` +
+                `**Jogadores:** ${game.getPlayerCount()}/20\n` +
+                `**Status:** ${statusText}\n` +
+                `**Dicas:** ❌ Não permitidas no modo Stop\n` +
+                `**Desistir:** ✅ Sair da sala sem revelar a palavra` +
+                progressText +
+                `\n\n📋 **Para convidar outros:**\n\`/join ${game.id}\`\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!`,
             ephemeral: roomId ? true : false
         })
     }

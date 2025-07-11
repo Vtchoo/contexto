@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
 
 class JoinCommand implements ICommand {
 
@@ -43,6 +43,18 @@ class JoinCommand implements ICommand {
                 const game = gameManager.joinCooperativeGame(playerId, gameInstanceId)
                 await interaction.reply({
                     content: `🤝 **Você entrou na sala cooperativa!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${game.finished ? 'Finalizado' : 'Em andamento'}\n\nUse \`/c <palavra>\` para fazer suas tentativas.`,
+                    ephemeral: true,
+                })
+                return
+            }
+
+            // Try to join as stop game
+            const stopInfo = gameManager.getStopGameInfo(gameInstanceId)
+            if (stopInfo.exists) {
+                const game = gameManager.joinStopGame(playerId, gameInstanceId)
+                const statusText = game.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
+                await interaction.reply({
+                    content: `⚡ **Você entrou na sala Stop!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!\n${game.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
                     ephemeral: true,
                 })
                 return
