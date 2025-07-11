@@ -5,6 +5,7 @@ import Discord, { AuditLogEvent, Client, EmbedBuilder, Events, GatewayIntentBits
 import { ICommand } from './types'
 import createConnection from './database'
 import bot from './core/Bot'
+import gameManager from './game'
 import { format } from 'date-fns'
 
 async function startClient() {
@@ -12,6 +13,9 @@ async function startClient() {
     console.log('Initializing Bot')
 
     await createConnection()
+    
+    console.log('Initializing Game Manager')
+    await gameManager.initialize()
     
     const client = new Client({
         intents: [
@@ -36,6 +40,12 @@ async function startClient() {
  
     client.on(Events.ClientReady, (client) => {
         console.log(`Logged in as ${client.user.tag}`)
+        
+        // Set up periodic memory cache cleanup (every hour)
+        setInterval(() => {
+            gameManager.clearMemoryCache()
+            console.log('Memory cache cleared')
+        }, 60 * 60 * 1000) // 1 hour
     })
     
     client.on(Events.InteractionCreate, async (interaction) => {

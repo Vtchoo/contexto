@@ -3,6 +3,7 @@ import GameApi from './gameApi'
 import { getTodaysGameId } from './utils/misc'
 import { v4 as uuid } from 'uuid'
 import { GameWord, Guess, IGame, PlayerScore } from './interface'
+import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
 
 class ContextoManager {
 
@@ -11,7 +12,7 @@ class ContextoManager {
     private playerGames: Map<string, string> = new Map() // playerId -> gameId , used to track which game a player is currently playing
     private gameTypes: Map<string, 'default' | 'competitive'> = new Map() // gameId -> game type
 
-    private cachedWords: Map<string, GameWord> = new Map() // gameId + word -> guesses, used to cache guesses for quick access and avoid unnecessary API calls
+    private memoryCache: Map<string, GameWord> = new Map() // In-memory cache for fast access during session
 
     public getCurrentOrCreateGame(playerId: string, gameType: 'default' | 'competitive' = 'default') {
         let game = this.getCurrentPlayerGame(playerId)
@@ -73,12 +74,68 @@ class ContextoManager {
         return this.createNewGame(playerId, 'competitive') as ContextoCompetitiveGame
     }
 
-    public getCachedWord(gameId: number, word: string): GameWord | undefined {
-        return this.cachedWords.get(`${gameId}-${word}`)
+    public async getCachedWord(gameId: number, word: string): Promise<GameWord | undefined> {
+        const normalizedWord = word.toLowerCase()
+        const cacheKey = `${gameId}-${normalizedWord}`
+        
+        // Check memory cache first for ultra-fast access
+        const memoryResult = this.memoryCache.get(cacheKey)
+        if (memoryResult) {
+            return memoryResult
+        }
+
+        // Check database cache
+        const repository = getCachedWordsRepository()
+        const cachedWord = await repository.findOne({
+            where: { gameId, word: normalizedWord }
+        })
+
+        if (cachedWord) {
+            const dbResult: GameWord = {
+                word: cachedWord.word,
+                lemma: cachedWord.lemma,
+                distance: cachedWord.distance,
+                error: cachedWord.error
+            }
+            // Store in memory cache for faster subsequent access
+            this.memoryCache.set(cacheKey, dbResult)
+            return dbResult
+        }
+
+        return undefined
     }
 
-    public cacheWord(gameId: number, word: GameWord) {
-        this.cachedWords.set(`${gameId}-${word.word}`, word)
+    public async cacheWord(gameId: number, word: GameWord): Promise<void> {
+        const normalizedWord = word.word.toLowerCase()
+        const cacheKey = `${gameId}-${normalizedWord}`
+        
+        // Store in memory cache for immediate access
+        this.memoryCache.set(cacheKey, word)
+        
+        // Store in database for persistence
+        const repository = getCachedWordsRepository()
+        
+        try {
+            // Try to insert new record
+            await repository.save({
+                gameId,
+                word: normalizedWord,
+                lemma: word.lemma,
+                distance: word.distance,
+                error: word.error
+            })
+        } catch (error) {
+            // If it fails due to unique constraint, update existing record
+            await repository.update(
+                { gameId, word: normalizedWord },
+                {
+                    lemma: word.lemma,
+                    distance: word.distance,
+                    error: word.error,
+                    updatedAt: new Date()
+                }
+            )
+        }
     }
 
     public leaveCurrentGame(playerId: string) {
@@ -98,6 +155,17 @@ class ContextoManager {
             }
         }
         this.playerGames.delete(playerId)
+    }
+
+    // Initialize the manager and start cleanup tasks
+    public async initialize(): Promise<void> {
+        // Database cache is kept permanently - no cleanup needed
+        console.log('ContextoManager initialized')
+    }
+
+    // Clean up memory cache periodically
+    public clearMemoryCache(): void {
+        this.memoryCache.clear()
     }
 }
 
@@ -206,7 +274,7 @@ class ContextoDefaultGame implements IGame {
         }
 
         // Check in the cached words first
-        const cachedWord = this.manager.getCachedWord(this.gameId, word)
+        const cachedWord = await this.manager.getCachedWord(this.gameId, word)
         if (cachedWord) {
             if (cachedWord.error) {
                 const guess = {
@@ -216,7 +284,7 @@ class ContextoDefaultGame implements IGame {
                 }
                 // this.addGuess(playerId, guess)
                 // Cache the error guess for quick access next time
-                this.manager.cacheWord(this.gameId, {
+                await this.manager.cacheWord(this.gameId, {
                     word,
                     error: cachedWord.error
                 })
@@ -247,7 +315,7 @@ class ContextoDefaultGame implements IGame {
                 this.finished = true // Mark the game as finished if the guess is correct
             }
             // Cache the word for quick access next time
-            this.manager.cacheWord(this.gameId, {
+            await this.manager.cacheWord(this.gameId, {
                 word: data.word,
                 lemma: data.lemma,
                 distance: data.distance
@@ -264,7 +332,7 @@ class ContextoDefaultGame implements IGame {
                     }
                     // this.addGuess(playerId, guess)
                     // Cache the error guess for quick access next time
-                    this.manager.cacheWord(this.gameId, {
+                    await this.manager.cacheWord(this.gameId, {
                         word,
                         error: message
                     })
@@ -390,7 +458,7 @@ class ContextoCompetitiveGame implements IGame {
         }
 
         // Check in the cached words first
-        const cachedWord = this.manager.getCachedWord(this.gameId, word)
+        const cachedWord = await this.manager.getCachedWord(this.gameId, word)
         if (cachedWord) {
             if (cachedWord.error) {
                 const guess: Guess = {
@@ -444,7 +512,7 @@ class ContextoCompetitiveGame implements IGame {
             }
             
             // Cache the word for quick access next time
-            this.manager.cacheWord(this.gameId, {
+            await this.manager.cacheWord(this.gameId, {
                 word: data.word,
                 lemma: data.lemma,
                 distance: data.distance
@@ -460,7 +528,7 @@ class ContextoCompetitiveGame implements IGame {
                         error: message
                     }
                     this.addGuess(playerId, guess)
-                    this.manager.cacheWord(this.gameId, { word, error: message })
+                    await this.manager.cacheWord(this.gameId, { word, error: message })
                     return guess
                 }
             }
