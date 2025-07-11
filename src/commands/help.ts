@@ -16,32 +16,45 @@ class HelpCommand implements ICommand {
                 {
                     name: "📝 Comandos Principais",
                     value: 
-                        "`/c <palavra>` - Joga uma palavra no Contexto\n" +
-                        "`/c <palavra> mode:competitive` - Joga no modo competitivo\n" +
-                        "`/c <palavra> game-id:12345` - Joga um jogo específico\n" +
+                        "`/c <palavra>` - Joga uma palavra no Contexto cooperativo\n" +
+                        "`/c <palavra> mode:competitive` - Cria/joga em sala competitiva\n" +
+                        "`/c <palavra> game-id:12345` - Joga um jogo específico do Contexto\n" +
                         "`/c <palavra> date:2025-07-09` - Joga um jogo de uma data específica",
                     inline: false
                 },
                 {
-                    name: "💡 Comandos de Ajuda",
+                    name: "🏆 Comandos Competitivos",
                     value: 
-                        "`/tip` - Recebe uma dica (apenas em jogos solo cooperativos)\n" +
-                        "`/giveup` - Desiste e revela a palavra (apenas em jogos solo cooperativos)",
+                        "`/create` - Cria uma sala competitiva privada\n" +
+                        "`/create game-id:12345` - Cria sala para um jogo específico\n" +
+                        "`/join <id-da-sala>` - Entra em uma sala competitiva existente\n" +
+                        "`/room` - Mostra informações da sua sala atual\n" +
+                        "`/room <id>` - Mostra informações de uma sala específica\n" +
+                        "`/ranking` - Mostra o ranking da sala competitiva",
                     inline: false
                 },
                 {
-                    name: "👥 Comandos de Grupo",
+                    name: "� Comandos de Ajuda",
                     value: 
-                        "`/join` - Entra em um jogo competitivo\n" +
+                        "`/tip` - Recebe uma dica (apenas em jogos cooperativos solo)\n" +
+                        "`/giveup` - Desiste e revela a palavra (apenas em jogos cooperativos solo)",
+                    inline: false
+                },
+                {
+                    name: "👥 Comandos Gerais",
+                    value: 
                         "`/leave` - Sai do jogo atual\n" +
-                        "`/ranking` - Mostra o ranking do jogo competitivo",
+                        "`/help` - Mostra esta ajuda",
                     inline: false
                 },
                 {
                     name: "ℹ️ Modos de Jogo",
                     value: 
                         "**Cooperativo:** Todos jogam juntos para encontrar a palavra\n" +
-                        "**Competitivo:** Cada jogador compete individualmente",
+                        "**Competitivo:** Salas privadas onde cada jogador compete individualmente\n\n" +
+                        "💡 **Criar salas competitivas:**\n" +
+                        "• `/c <palavra> mode:competitive` - Cria e joga imediatamente\n" +
+                        "• `/create` - Cria sala vazia para outros entrarem primeiro",
                     inline: false
                 },
                 {

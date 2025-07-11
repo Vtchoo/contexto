@@ -6,35 +6,39 @@ class JoinCommand implements ICommand {
 
     definition = new SlashCommandBuilder()
         .setName("join")
-        .setDescription("Entre em um jogo competitivo")
+        .addStringOption(option =>
+            option.setName("game-id")
+                .setDescription("ID do jogo competitivo para entrar (como uma sala privada)")
+                .setRequired(true)
+        )
+        .setDescription("Entre em um jogo competitivo específico usando o ID da sala")
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const playerId = interaction.user.id
+        const gameInstanceId = interaction.options.getString("game-id")
 
-        // Check if player is already in a game
-        const currentGame = gameManager.getCurrentPlayerGame(playerId)
-        if (currentGame) {
-            if (currentGame instanceof ContextoCompetitiveGame) {
-                await interaction.reply({
-                    content: `Você já está no jogo competitivo #${currentGame.gameId}. Use \`/ranking\` para ver sua posição.`,
-                    ephemeral: true,
-                })
-            } else {
-                await interaction.reply({
-                    content: `Você já está em um jogo cooperativo. Use \`/leave\` primeiro para sair do jogo atual.`,
-                    ephemeral: true,
-                })
-            }
+        if (!gameInstanceId) {
+            await interaction.reply({
+                content: "❌ Você deve especificar o ID do jogo para entrar em uma sala competitiva!",
+                ephemeral: true
+            })
             return
         }
 
-        // Find or create a competitive game
-        const game = gameManager.findOrCreateCompetitiveGame(playerId)
-        
-        await interaction.reply({
-            content: `🎯 Você entrou no jogo competitivo #${game.gameId}!\n\nUse \`/c <palavra>\` para fazer suas tentativas.\nUse \`/ranking\` para ver o placar atual.`,
-            ephemeral: true,
-        })
+        try {
+            // Join the specific competitive game by its instance ID
+            const game = gameManager.joinCompetitiveGame(playerId, gameInstanceId)
+            
+            await interaction.reply({
+                content: `🎯 Você entrou na sala competitiva!\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/10\n\nUse \`/c <palavra>\` para fazer suas tentativas.\nUse \`/ranking\` para ver o placar atual.`,
+                ephemeral: true,
+            })
+        } catch (error) {
+            await interaction.reply({
+                content: `❌ Erro ao entrar na sala: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+                ephemeral: true,
+            })
+        }
     }
 }
 

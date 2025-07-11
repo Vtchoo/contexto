@@ -36,7 +36,7 @@ class MainCommand implements ICommand {
                 .setDescription("Data do jogo no formato YYYY-MM-DD (ex: 2025-07-09)")
                 .setRequired(false)
         )
-        .setDescription("Jogue Contexto, um jogo de adivinhação de palavras!")
+        .setDescription("Jogue Contexto - cooperativo ou em salas competitivas!")
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const word = interaction.options.getString("word")
@@ -63,13 +63,21 @@ class MainCommand implements ICommand {
             gameIdOrDate = parsedDate
         }
 
-        const [game, justStarted] = gameManager.getCurrentOrCreateGame(playerId, gameType, gameIdOrDate)
+        try {
+            const [game, justStarted] = gameManager.getCurrentOrCreateGame(playerId, gameType, gameIdOrDate)
 
-        // Handle game-specific logic
-        if (game instanceof ContextoDefaultGame) {
-            return this.handleDefaultGame(interaction, game, word, playerId, justStarted)
-        } else if (game instanceof ContextoCompetitiveGame) {
-            return this.handleCompetitiveGame(interaction, game, word, playerId, justStarted)
+            // Handle game-specific logic
+            if (game instanceof ContextoDefaultGame) {
+                return this.handleDefaultGame(interaction, game, word, playerId, justStarted)
+            } else if (game instanceof ContextoCompetitiveGame) {
+                return this.handleCompetitiveGame(interaction, game, word, playerId, justStarted)
+            }
+        } catch (error) {
+            await interaction.reply({
+                content: `❌ ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+                ephemeral: true
+            })
+            return
         }
     }
 
@@ -118,7 +126,7 @@ class MainCommand implements ICommand {
         }
 
         await interaction.reply({
-            content: `Contexto game started! Word: ${word}\nGame ID: ${game.id}${this.formatGameDate(game.gameId)}\nJust started: ${justStarted}`,
+            content: `🤝 **Jogo Cooperativo**\n\n**Palavra:** ${word}\n**Jogo:** #${game.gameId}${this.formatGameDate(game.gameId)}\n**Status:** ${justStarted ? 'Iniciado agora' : 'Em andamento'}`,
             ephemeral: true
         })
     }
@@ -171,8 +179,8 @@ class MainCommand implements ICommand {
         }
 
         await interaction.reply({
-            content: `Jogo competitivo iniciado! Word: ${word}\nGame ID: ${game.id}${this.formatGameDate(game.gameId)}\nJust started: ${justStarted}`,
-            ephemeral: true
+            content: `🎯 **Sala Competitiva**${justStarted ? ' (Nova!)' : ''}\n\n**Palavra:** ${word}\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}${this.formatGameDate(game.gameId)}\n**Status:** ${justStarted ? 'Criada agora' : 'Em andamento'}\n\n${justStarted ? '📋 **Compartilhe este ID para outros entrarem:**\n`/join ' + game.id + '`\n\n' : ''}Use \`/room\` para ver informações da sala.`,
+            ephemeral: justStarted ? false : true // Public if new room created (so others can see the join code), private otherwise
         })
     }
 
