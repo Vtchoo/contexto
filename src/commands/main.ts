@@ -1,7 +1,8 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
 import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame } from "../game"
-import { getBarColor, getBarWidth } from "../game/utils/misc"
+import { getBarColor, getBarWidth, getTodaysGameId } from "../game/utils/misc"
+import { parseISO } from "date-fns"
 
 
 
@@ -25,16 +26,44 @@ class MainCommand implements ICommand {
                     { name: "Competitivo", value: "competitive" }
                 )
         )
+        .addIntegerOption(option =>
+            option.setName("game-id")
+                .setDescription("ID do jogo específico (para jogar um jogo de um dia específico)")
+                .setRequired(false)
+        )
+        .addStringOption(option =>
+            option.setName("date")
+                .setDescription("Data do jogo no formato YYYY-MM-DD (ex: 2025-07-09)")
+                .setRequired(false)
+        )
         .setDescription("Jogue Contexto, um jogo de adivinhação de palavras!")
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const word = interaction.options.getString("word")
         const mode = interaction.options.getString("mode") as 'default' | 'competitive' | null
+        const gameId = interaction.options.getInteger("game-id")
+        const dateString = interaction.options.getString("date")
 
         const playerId = interaction.user.id
         const gameType = mode || 'default'
 
-        const [game, justStarted] = gameManager.getCurrentOrCreateGame(playerId, gameType)
+        // Parse date if provided
+        let gameIdOrDate: number | Date | undefined
+        if (gameId) {
+            gameIdOrDate = gameId
+        } else if (dateString) {
+            const parsedDate = parseISO(dateString)
+            if (isNaN(parsedDate.getTime())) {
+                await interaction.reply({
+                    content: "❌ Data inválida! Use o formato YYYY-MM-DD (ex: 2025-07-09)",
+                    ephemeral: true
+                })
+                return
+            }
+            gameIdOrDate = parsedDate
+        }
+
+        const [game, justStarted] = gameManager.getCurrentOrCreateGame(playerId, gameType, gameIdOrDate)
 
         // Handle game-specific logic
         if (game instanceof ContextoDefaultGame) {
@@ -89,7 +118,7 @@ class MainCommand implements ICommand {
         }
 
         await interaction.reply({
-            content: `Contexto game started! Word: ${word}\nGame ID: ${game.id}\nJust started: ${justStarted}`,
+            content: `Contexto game started! Word: ${word}\nGame ID: ${game.id}${this.formatGameDate(game.gameId)}\nJust started: ${justStarted}`,
             ephemeral: true
         })
     }
@@ -142,7 +171,7 @@ class MainCommand implements ICommand {
         }
 
         await interaction.reply({
-            content: `Jogo competitivo iniciado! Word: ${word}\nGame ID: ${game.id}\nJust started: ${justStarted}`,
+            content: `Jogo competitivo iniciado! Word: ${word}\nGame ID: ${game.id}${this.formatGameDate(game.gameId)}\nJust started: ${justStarted}`,
             ephemeral: true
         })
     }
@@ -191,9 +220,11 @@ class MainCommand implements ICommand {
 
             if (mode === 'competitive' && game instanceof ContextoCompetitiveGame && playerId) {
                 const playerGuessCount = game.getGuessCount(playerId)
-                guessCountText = `Jogo: #${game.gameId} Suas tentativas: ${playerGuessCount}\n\n`
+                const gameDate = this.formatGameDate(game.gameId)
+                guessCountText = `Jogo: #${game.gameId}${gameDate} Suas tentativas: ${playerGuessCount}\n\n`
             } else if (mode === 'default' && game instanceof ContextoDefaultGame) {
-                guessCountText = `Jogo: #${game.gameId} Tentativas: ${game.getGuessCount()}\n\n`
+                const gameDate = this.formatGameDate(game.gameId)
+                guessCountText = `Jogo: #${game.gameId}${gameDate} Tentativas: ${game.getGuessCount()}\n\n`
             }
 
             await interaction.reply({
@@ -212,6 +243,31 @@ class MainCommand implements ICommand {
             content: `\`\`\`You guessed the word: ${result.word}\n\n\n${JSON.stringify(result, null, 2)}\`\`\``,
             ephemeral: true
         })
+    }
+
+    private formatGameDate(gameId: number): string {
+        const todaysGameId = getTodaysGameId()
+        const today = new Date()
+        const daysDiff = todaysGameId - gameId
+        
+        if (daysDiff === 0) {
+            return '' // Don't show date for today's game
+        }
+        
+        const gameDate = new Date(today)
+        gameDate.setDate(gameDate.getDate() - daysDiff)
+        
+        const dateStr = gameDate.toLocaleDateString('pt-BR', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric' 
+        })
+        
+        if (daysDiff > 0) {
+            return ` (${dateStr})` // Past game
+        } else {
+            return ` (${dateStr})` // Future game
+        }
     }
 }
 // discord ansi colors

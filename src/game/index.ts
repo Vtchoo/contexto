@@ -14,11 +14,11 @@ class ContextoManager {
 
     private memoryCache: Map<string, GameWord> = new Map() // In-memory cache for fast access during session
 
-    public getCurrentOrCreateGame(playerId: string, gameType: 'default' | 'competitive' = 'default') {
+    public getCurrentOrCreateGame(playerId: string, gameType: 'default' | 'competitive' = 'default', gameIdOrDate?: number | Date) {
         let game = this.getCurrentPlayerGame(playerId)
         let justStarted = false
         if (!game) {
-            game = this.createNewGame(playerId, gameType)
+            game = this.createNewGame(playerId, gameType, gameIdOrDate)
             justStarted = true
         }
         return [game, justStarted] as const
@@ -37,15 +37,15 @@ class ContextoManager {
         return undefined
     }
 
-    public createNewGame(playerId: string, gameType: 'default' | 'competitive' = 'default') {
+    public createNewGame(playerId: string, gameType: 'default' | 'competitive' = 'default', gameIdOrDate?: number | Date) {
         if (gameType === 'competitive') {
-            const game = new ContextoCompetitiveGame(playerId, this)
+            const game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
             this.competitiveGames.set(game.id, game)
             this.playerGames.set(playerId, game.id)
             this.gameTypes.set(game.id, 'competitive')
             return game
         } else {
-            const game = new ContextoDefaultGame(playerId, this)
+            const game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
             this.defaultGames.set(game.id, game)
             this.playerGames.set(playerId, game.id)
             this.gameTypes.set(game.id, 'default')
@@ -54,24 +54,39 @@ class ContextoManager {
     }
 
     // Find or create a competitive game for a player to join
-    public findOrCreateCompetitiveGame(playerId: string): ContextoCompetitiveGame {
+    public findOrCreateCompetitiveGame(playerId: string, gameIdOrDate?: number | Date): ContextoCompetitiveGame {
         // Check if player is already in a competitive game
         const currentGame = this.getCurrentPlayerGame(playerId)
         if (currentGame && currentGame instanceof ContextoCompetitiveGame) {
             return currentGame
         }
 
-        // Find an existing competitive game that's still accepting players
-        for (const game of this.competitiveGames.values()) {
-            if (game.players.length < 10 && !game.hasPlayerCompleted(playerId)) { // Arbitrary max of 10 players
-                game.addPlayer(playerId)
-                this.playerGames.set(playerId, game.id)
-                return game
+        // If a specific game ID is requested, find or create a game with that ID
+        if (gameIdOrDate !== undefined) {
+            const targetGameId = typeof gameIdOrDate === 'number' ? gameIdOrDate : 
+                gameIdOrDate instanceof Date ? this.dateToGameId(gameIdOrDate) : getTodaysGameId()
+            
+            // Find an existing competitive game with the same game ID
+            for (const game of this.competitiveGames.values()) {
+                if (game.gameId === targetGameId && game.players.length < 10 && !game.hasPlayerCompleted(playerId)) {
+                    game.addPlayer(playerId)
+                    this.playerGames.set(playerId, game.id)
+                    return game
+                }
+            }
+        } else {
+            // Find an existing competitive game that's still accepting players (any game ID)
+            for (const game of this.competitiveGames.values()) {
+                if (game.players.length < 10 && !game.hasPlayerCompleted(playerId)) {
+                    game.addPlayer(playerId)
+                    this.playerGames.set(playerId, game.id)
+                    return game
+                }
             }
         }
 
         // Create a new competitive game
-        return this.createNewGame(playerId, 'competitive') as ContextoCompetitiveGame
+        return this.createNewGame(playerId, 'competitive', gameIdOrDate) as ContextoCompetitiveGame
     }
 
     public async getCachedWord(gameId: number, word: string): Promise<GameWord | undefined> {
@@ -167,6 +182,23 @@ class ContextoManager {
     public clearMemoryCache(): void {
         this.memoryCache.clear()
     }
+
+    // Convenience method to create a game for a specific date
+    public createGameForDate(playerId: string, date: Date, gameType: 'default' | 'competitive' = 'default') {
+        return this.createNewGame(playerId, gameType, date)
+    }
+
+    // Convenience method to create a game for a specific game ID
+    public createGameForId(playerId: string, gameId: number, gameType: 'default' | 'competitive' = 'default') {
+        return this.createNewGame(playerId, gameType, gameId)
+    }
+
+    // Helper method to convert Date to game ID
+    private dateToGameId(date: Date): number {
+        const today = new Date()
+        const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+        return getTodaysGameId() - diffDays
+    }
 }
 
 class ContextoDefaultGame implements IGame {
@@ -195,23 +227,36 @@ class ContextoDefaultGame implements IGame {
     }
 
     public get gameDate(): Date {
-        const date = new Date()
-        date.setDate(date.getDate() - (this.gameId % 10000))
-        return date
+        const today = new Date()
+        const todaysGameId = getTodaysGameId()
+        const daysDiff = todaysGameId - this.gameId
+        const gameDate = new Date(today)
+        gameDate.setDate(gameDate.getDate() - daysDiff)
+        return gameDate
     }
 
     public get guessCount(): number {
         return this.guesses.length
     }
 
-    constructor(playerId: string, manager: ContextoManager, idOrDate?: string | Date) {
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
 
         this.manager = manager
 
-        // TODO: Initialize game with id or date
+        // Initialize game with specific id, date, or use today's game
         this.players = [playerId]
 
-        this.gameId = getTodaysGameId()
+        if (typeof gameIdOrDate === 'number') {
+            this.gameId = gameIdOrDate
+        } else if (gameIdOrDate instanceof Date) {
+            // Convert date to game ID (you may need to implement this logic based on your game's date system)
+            const today = new Date()
+            const diffDays = Math.floor((today.getTime() - gameIdOrDate.getTime()) / (1000 * 60 * 60 * 24))
+            this.gameId = getTodaysGameId() - diffDays
+        } else {
+            this.gameId = getTodaysGameId()
+        }
+        
         this.gameApi = GameApi('pt-br', this.gameId)
     }
 
@@ -373,8 +418,18 @@ class ContextoCompetitiveGame implements IGame {
 
     started = false
 
-    constructor(playerId: string, manager: ContextoManager, idOrDate?: string | Date) {
-        this.gameId = getTodaysGameId()
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
+        if (typeof gameIdOrDate === 'number') {
+            this.gameId = gameIdOrDate
+        } else if (gameIdOrDate instanceof Date) {
+            // Convert date to game ID
+            const today = new Date()
+            const diffDays = Math.floor((today.getTime() - gameIdOrDate.getTime()) / (1000 * 60 * 60 * 24))
+            this.gameId = getTodaysGameId() - diffDays
+        } else {
+            this.gameId = getTodaysGameId()
+        }
+        
         this.players.push(playerId)
         this.manager = manager
         this.gameApi = GameApi('pt-br', this.gameId)
