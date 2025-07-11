@@ -17,7 +17,7 @@ class ContextoManager {
         let game = this.getCurrentPlayerGame(playerId)
         let justStarted = false
         if (!game) {
-            // Allow creating competitive games through this method
+            // Always create a new private room for any game type
             game = this.createNewGame(playerId, gameType, gameIdOrDate)
             justStarted = true
         }
@@ -87,9 +87,51 @@ class ContextoManager {
         return game
     }
 
+    // Join a specific cooperative game by its instance ID (like a private room/lobby)
+    public joinCooperativeGame(playerId: string, gameInstanceId: string): ContextoDefaultGame {
+        // Check if player is already in a cooperative game
+        const currentGame = this.getCurrentPlayerGame(playerId)
+        if (currentGame && currentGame instanceof ContextoDefaultGame) {
+            if (currentGame.id === gameInstanceId) {
+                return currentGame // Already in this game
+            }
+            throw new Error("You are already in another cooperative game. Use /leave first.")
+        }
+
+        // Find the specific cooperative game by its instance ID
+        const game = this.defaultGames.get(gameInstanceId)
+        if (!game) {
+            throw new Error(`Cooperative game with ID ${gameInstanceId} not found`)
+        }
+
+        // Check if game has room for more players (cooperative games can have more players)
+        if (game.getPlayerCount() >= 20) {
+            throw new Error("This cooperative game is full (max 20 players)")
+        }
+
+        // Check if game is already finished
+        if (game.finished) {
+            throw new Error("This cooperative game has already been completed")
+        }
+
+        // Add player to the game
+        game.addPlayer(playerId)
+        this.playerGames.set(playerId, game.id)
+        return game
+    }
+
     // Get information about a competitive game room
     public getCompetitiveGameInfo(gameInstanceId: string): { game: ContextoCompetitiveGame; exists: boolean } {
         const game = this.competitiveGames.get(gameInstanceId)
+        return {
+            game: game!,
+            exists: !!game
+        }
+    }
+
+    // Get information about a cooperative game room
+    public getCooperativeGameInfo(gameInstanceId: string): { game: ContextoDefaultGame; exists: boolean } {
+        const game = this.defaultGames.get(gameInstanceId)
         return {
             game: game!,
             exists: !!game

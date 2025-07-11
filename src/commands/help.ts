@@ -16,20 +16,26 @@ class HelpCommand implements ICommand {
                 {
                     name: "📝 Comandos Principais",
                     value: 
-                        "`/c <palavra>` - Joga uma palavra no Contexto cooperativo\n" +
-                        "`/c <palavra> mode:competitive` - Cria/joga em sala competitiva\n" +
+                        "`/c <palavra>` - Cria sala cooperativa e joga uma palavra\n" +
+                        "`/c <palavra> mode:competitive` - Cria sala competitiva e joga\n" +
                         "`/c <palavra> game-id:12345` - Joga um jogo específico do Contexto\n" +
                         "`/c <palavra> date:2025-07-09` - Joga um jogo de uma data específica",
                     inline: false
                 },
                 {
-                    name: "🏆 Comandos Competitivos",
+                    name: "� Comandos de Sala",
                     value: 
-                        "`/create` - Cria uma sala competitiva privada\n" +
-                        "`/create game-id:12345` - Cria sala para um jogo específico\n" +
-                        "`/join <id-da-sala>` - Entra em uma sala competitiva existente\n" +
+                        "`/create` - Cria uma sala cooperativa vazia\n" +
+                        "`/create mode:competitive` - Cria uma sala competitiva vazia\n" +
+                        "`/join <id-da-sala>` - Entra em uma sala existente\n" +
                         "`/room` - Mostra informações da sua sala atual\n" +
                         "`/room <id>` - Mostra informações de uma sala específica\n" +
+                        "`/leave` - Sai da sala atual",
+                    inline: false
+                },
+                {
+                    name: "🏆 Comandos Competitivos",
+                    value: 
                         "`/ranking` - Mostra o ranking da sala competitiva",
                     inline: false
                 },
@@ -43,18 +49,20 @@ class HelpCommand implements ICommand {
                 {
                     name: "👥 Comandos Gerais",
                     value: 
-                        "`/leave` - Sai do jogo atual\n" +
                         "`/help` - Mostra esta ajuda",
                     inline: false
                 },
                 {
-                    name: "ℹ️ Modos de Jogo",
+                    name: "ℹ️ Sistema de Salas",
                     value: 
+                        "**Todas as partidas são salas privadas com ID único**\n\n" +
                         "**Cooperativo:** Todos jogam juntos para encontrar a palavra\n" +
-                        "**Competitivo:** Salas privadas onde cada jogador compete individualmente\n\n" +
-                        "💡 **Criar salas competitivas:**\n" +
-                        "• `/c <palavra> mode:competitive` - Cria e joga imediatamente\n" +
-                        "• `/create` - Cria sala vazia para outros entrarem primeiro",
+                        "**Competitivo:** Cada jogador compete individualmente\n\n" +
+                        "💡 **Como funciona:**\n" +
+                        "• `/c <palavra>` - Cria sala e joga imediatamente\n" +
+                        "• `/create` - Cria sala vazia para outros entrarem\n" +
+                        "• `/join <id>` - Entra em sala existente\n" +
+                        "• Compartilhe o ID da sala para convidar outros!",
                     inline: false
                 },
                 {

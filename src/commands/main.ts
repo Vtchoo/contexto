@@ -126,8 +126,8 @@ class MainCommand implements ICommand {
         }
 
         await interaction.reply({
-            content: `🤝 **Jogo Cooperativo**\n\n**Palavra:** ${word}\n**Jogo:** #${game.gameId}${this.formatGameDate(game.gameId)}\n**Status:** ${justStarted ? 'Iniciado agora' : 'Em andamento'}`,
-            ephemeral: true
+            content: `🤝 **Jogo Cooperativo**${justStarted ? ' (Nova sala!)' : ''}\n\n**Palavra:** ${word}\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}${this.formatGameDate(game.gameId)}\n**Status:** ${justStarted ? 'Criada agora' : 'Em andamento'}\n\n${justStarted ? '📋 **Compartilhe este ID para outros entrarem:**\n`/join ' + game.id + '`\n\n' : ''}Use \`/room\` para ver informações da sala.`,
+            ephemeral: justStarted ? false : true // Public if new room created (so others can see the join code), private otherwise
         })
     }
 

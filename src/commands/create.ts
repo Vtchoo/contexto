@@ -1,12 +1,21 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame } from "../game"
 import { parseISO } from "date-fns"
 
 class CreateCommand implements ICommand {
 
     definition = new SlashCommandBuilder()
         .setName("create")
+        .addStringOption(option =>
+            option.setName("mode")
+                .setDescription("Tipo de sala a criar")
+                .setRequired(false)
+                .addChoices(
+                    { name: "Cooperativa (padrão)", value: "default" },
+                    { name: "Competitiva", value: "competitive" }
+                )
+        )
         .addIntegerOption(option =>
             option.setName("game-id")
                 .setDescription("ID do jogo Contexto específico (opcional, padrão é o jogo de hoje)")
@@ -17,12 +26,15 @@ class CreateCommand implements ICommand {
                 .setDescription("Data do jogo no formato YYYY-MM-DD (alternativa ao game-id)")
                 .setRequired(false)
         )
-        .setDescription("Crie uma sala competitiva privada para outros jogadores entrarem")
+        .setDescription("Crie uma sala privada para outros jogadores entrarem")
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const playerId = interaction.user.id
+        const mode = interaction.options.getString("mode") as 'default' | 'competitive' | null
         const gameId = interaction.options.getInteger("game-id")
         const dateString = interaction.options.getString("date")
+
+        const gameType = mode || 'default'
 
         // Check if player is already in a game
         const currentGame = gameManager.getCurrentPlayerGame(playerId)
@@ -32,9 +44,9 @@ class CreateCommand implements ICommand {
                     content: `Você já criou/entrou na sala competitiva \`${currentGame.id}\`. Use \`/leave\` primeiro para sair.`,
                     ephemeral: true,
                 })
-            } else {
+            } else if (currentGame instanceof ContextoDefaultGame) {
                 await interaction.reply({
-                    content: `Você já está em um jogo cooperativo. Use \`/leave\` primeiro para sair do jogo atual.`,
+                    content: `Você já criou/entrou na sala cooperativa \`${currentGame.id}\`. Use \`/leave\` primeiro para sair.`,
                     ephemeral: true,
                 })
             }
@@ -58,13 +70,20 @@ class CreateCommand implements ICommand {
         }
 
         try {
-            // Create a new competitive game room
-            const game = gameManager.createNewGame(playerId, 'competitive', gameIdOrDate) as ContextoCompetitiveGame
+            // Create a new game room
+            const game = gameManager.createNewGame(playerId, gameType, gameIdOrDate)
             
-            await interaction.reply({
-                content: `🎯 **Sala competitiva criada!**\n\n**ID da Sala:** \`${game.id}\`\n**Jogo Contexto:** #${game.gameId}\n**Criador:** <@${playerId}>\n**Jogadores:** 1/10\n\n📋 **Compartilhe este ID para outros jogadores entrarem:**\n\`/join ${game.id}\`\n\n🎮 Use \`/c <palavra>\` para começar a jogar!\n📊 Use \`/ranking\` para ver o placar.`,
-                ephemeral: false, // Make this public so others can see the room ID
-            })
+            if (game instanceof ContextoCompetitiveGame) {
+                await interaction.reply({
+                    content: `🎯 **Sala competitiva criada!**\n\n**ID da Sala:** \`${game.id}\`\n**Jogo Contexto:** #${game.gameId}\n**Criador:** <@${playerId}>\n**Jogadores:** 1/10\n\n📋 **Compartilhe este ID para outros jogadores entrarem:**\n\`/join ${game.id}\`\n\n🎮 Use \`/c <palavra>\` para começar a jogar!\n📊 Use \`/ranking\` para ver o placar.`,
+                    ephemeral: false, // Make this public so others can see the room ID
+                })
+            } else {
+                await interaction.reply({
+                    content: `🤝 **Sala cooperativa criada!**\n\n**ID da Sala:** \`${game.id}\`\n**Jogo Contexto:** #${game.gameId}\n**Criador:** <@${playerId}>\n**Jogadores:** 1/20\n\n📋 **Compartilhe este ID para outros jogadores entrarem:**\n\`/join ${game.id}\`\n\n🎮 Use \`/c <palavra>\` para começar a jogar!`,
+                    ephemeral: false, // Make this public so others can see the room ID
+                })
+            }
         } catch (error) {
             await interaction.reply({
                 content: `❌ Erro ao criar sala: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame } from "../game"
 
 class RoomCommand implements ICommand {
 
@@ -11,31 +11,37 @@ class RoomCommand implements ICommand {
                 .setDescription("ID da sala para ver informações (opcional, mostra sua sala atual se omitido)")
                 .setRequired(false)
         )
-        .setDescription("Mostra informações sobre uma sala competitiva")
+        .setDescription("Mostra informações sobre uma sala (cooperativa ou competitiva)")
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const playerId = interaction.user.id
         const roomId = interaction.options.getString("id")
 
-        let game: ContextoCompetitiveGame | undefined
+        let game: ContextoCompetitiveGame | ContextoDefaultGame | undefined
 
         if (roomId) {
-            // Check specific room ID
-            const roomInfo = gameManager.getCompetitiveGameInfo(roomId)
-            if (!roomInfo.exists) {
-                await interaction.reply({
-                    content: `❌ Sala com ID \`${roomId}\` não encontrada.`,
-                    ephemeral: true
-                })
-                return
+            // Check specific room ID - try competitive first, then cooperative
+            const competitiveInfo = gameManager.getCompetitiveGameInfo(roomId)
+            if (competitiveInfo.exists) {
+                game = competitiveInfo.game
+            } else {
+                const cooperativeInfo = gameManager.getCooperativeGameInfo(roomId)
+                if (cooperativeInfo.exists) {
+                    game = cooperativeInfo.game
+                } else {
+                    await interaction.reply({
+                        content: `❌ Sala com ID \`${roomId}\` não encontrada.`,
+                        ephemeral: true
+                    })
+                    return
+                }
             }
-            game = roomInfo.game
         } else {
             // Check player's current game
             const currentGame = gameManager.getCurrentPlayerGame(playerId)
-            if (!currentGame || !(currentGame instanceof ContextoCompetitiveGame)) {
+            if (!currentGame) {
                 await interaction.reply({
-                    content: `❌ Você não está em nenhuma sala competitiva. Use \`/room <id>\` para ver informações de uma sala específica.`,
+                    content: `❌ Você não está em nenhuma sala. Use \`/room <id>\` para ver informações de uma sala específica.`,
                     ephemeral: true
                 })
                 return
@@ -43,8 +49,16 @@ class RoomCommand implements ICommand {
             game = currentGame
         }
 
-        const leaderboard = game!.getLeaderboard()
-        const activeStats = game!.getActivePlayerStats()
+        if (game instanceof ContextoCompetitiveGame) {
+            return this.showCompetitiveRoomInfo(interaction, game, roomId || undefined)
+        } else if (game instanceof ContextoDefaultGame) {
+            return this.showCooperativeRoomInfo(interaction, game, roomId || undefined)
+        }
+    }
+
+    private async showCompetitiveRoomInfo(interaction: any, game: ContextoCompetitiveGame, roomId?: string) {
+        const leaderboard = game.getLeaderboard()
+        const activeStats = game.getActivePlayerStats()
         
         let leaderboardText = ""
         if (leaderboard.length > 0) {
@@ -64,16 +78,43 @@ class RoomCommand implements ICommand {
 
         await interaction.reply({
             content: 
-                `🎯 **Informações da Sala Competitiva**\n\n` +
-                `**ID da Sala:** \`${game!.id}\`\n` +
-                `**Jogo Contexto:** #${game!.gameId}\n` +
-                `**Jogadores:** ${game!.getPlayerCount()}/10\n` +
-                `**Dicas:** ${game!.canUseTips() ? "✅ Permitidas" : "❌ Desabilitadas"}\n` +
-                `**Desistir:** ${game!.canGiveUp() ? "✅ Permitido" : "❌ Desabilitado"}` +
+                `🎯 **Sala Competitiva**\n\n` +
+                `**ID da Sala:** \`${game.id}\`\n` +
+                `**Jogo Contexto:** #${game.gameId}\n` +
+                `**Jogadores:** ${game.getPlayerCount()}/10\n` +
+                `**Dicas:** ${game.canUseTips() ? "✅ Permitidas" : "❌ Desabilitadas"}\n` +
+                `**Desistir:** ${game.canGiveUp() ? "✅ Permitido" : "❌ Desabilitado"}` +
                 leaderboardText +
                 activePlayersText +
-                `\n\n📋 **Para convidar outros:**\n\`/join ${game!.id}\``,
-            ephemeral: roomId ? true : false // Public if showing current room, private if checking specific room
+                `\n\n📋 **Para convidar outros:**\n\`/join ${game.id}\``,
+            ephemeral: roomId ? true : false
+        })
+    }
+
+    private async showCooperativeRoomInfo(interaction: any, game: ContextoDefaultGame, roomId?: string) {
+        const closestGuesses = game.getClosestGuesses('any', 5) // Get top 5 guesses
+        
+        let guessesText = ""
+        if (closestGuesses.length > 0) {
+            guessesText = "\n🎯 **Tentativas mais próximas:**\n" +
+                closestGuesses.map((guess, index) => 
+                    `${index + 1}. ${guess.word} - Distância ${(guess.distance || 0) + 1}`
+                ).join('\n')
+        }
+
+        await interaction.reply({
+            content: 
+                `🤝 **Sala Cooperativa**\n\n` +
+                `**ID da Sala:** \`${game.id}\`\n` +
+                `**Jogo Contexto:** #${game.gameId}\n` +
+                `**Jogadores:** ${game.getPlayerCount()}/20\n` +
+                `**Status:** ${game.finished ? '✅ Finalizado' : '🎮 Em andamento'}\n` +
+                `**Total de tentativas:** ${game.getGuessCount()}\n` +
+                `**Dicas:** ${game.canUseTips() ? "✅ Permitidas" : "❌ Desabilitadas"}\n` +
+                `**Desistir:** ${game.canGiveUp() ? "✅ Permitido" : "❌ Desabilitado"}` +
+                guessesText +
+                `\n\n📋 **Para convidar outros:**\n\`/join ${game.id}\``,
+            ephemeral: roomId ? true : false
         })
     }
 }
