@@ -11,6 +11,7 @@ interface Guess {
 
 interface GameInterfaceProps {
   gameId?: number
+  roomId?: string
   guesses: Guess[]
   onGuess: (word: string) => void
   gameFinished: boolean
@@ -19,6 +20,7 @@ interface GameInterfaceProps {
 
 function GameInterface({ 
   gameId, 
+  roomId,
   guesses, 
   onGuess, 
   gameFinished, 
@@ -131,6 +133,13 @@ function GameInterface({
         )}
 
         <div className="info-bar">
+          {roomId && (
+            <>
+              <span className="label">SALA:</span>{' '}
+              <span style={{ fontWeight: 'bold', fontSize: '1.1em', color: '#28a745' }}>{roomId}</span>
+              &nbsp;&nbsp;&nbsp;
+            </>
+          )}
           {gameId && (
             <>
               <span className="label">JOGO:</span>{' '}

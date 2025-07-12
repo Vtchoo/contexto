@@ -198,7 +198,7 @@ function HomePage() {
   const [showDemo, setShowDemo] = useState(false)
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
-  const { createGame, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected } = useGame()
+  const { createGame, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId } = useGame()
 
   const handleQuickPlay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -250,6 +250,8 @@ function HomePage() {
       <Container>
         <DemoGame>
           <GameInterface
+            gameId={currentGameId ? parseInt(currentGameId) : undefined}
+            roomId={currentRoom || undefined}
             guesses={guesses}
             onGuess={makeGuess}
             gameFinished={gameFinished}

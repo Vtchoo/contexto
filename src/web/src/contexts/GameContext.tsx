@@ -6,6 +6,7 @@ interface GameContextType {
   user: User | null
   socket: Socket | null
   currentRoom: string | null
+  currentGameId: string | null
   isConnected: boolean
   loading: boolean
   error: string | null
@@ -30,6 +31,7 @@ export function GameProvider({ children }: GameProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
   const [currentRoom, setCurrentRoom] = useState<string | null>(null)
+  const [currentGameId, setCurrentGameId] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,10 +64,12 @@ export function GameProvider({ children }: GameProviderProps) {
 
     newSocket.on('room_joined', (data) => {
       setCurrentRoom(data.roomId)
+      setCurrentGameId(data.gameId)
     })
 
     newSocket.on('room_left', () => {
       setCurrentRoom(null)
+      setCurrentGameId(null)
     })
 
     newSocket.on('game_update', (data) => {
@@ -111,6 +115,7 @@ export function GameProvider({ children }: GameProviderProps) {
       setSocket(null)
       setIsConnected(false)
       setCurrentRoom(null)
+      setCurrentGameId(null)
     }
   }
 
@@ -188,6 +193,7 @@ export function GameProvider({ children }: GameProviderProps) {
         user,
         socket,
         currentRoom,
+        currentGameId,
         isConnected,
         loading,
         error,
