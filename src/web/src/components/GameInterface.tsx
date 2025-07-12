@@ -40,10 +40,10 @@ function GameInterface({
 
   const getGameModeDisplayName = (mode: string | null) => {
     const modeNames = {
-      'default': 'Clássico',
-      'competitive': 'Competitivo',
-      'battle-royale': 'Battle Royale',
-      'stop': 'Stop'
+      'default': '🤝 Clássico',
+      'competitive': '🎯 Competitivo', 
+      'battle-royale': '⚔️ Battle Royale',
+      'stop': '⚡ Stop'
     }
     return mode ? modeNames[mode as keyof typeof modeNames] || mode : null
   }
@@ -276,7 +276,7 @@ function GameInterface({
             </>
           )}
           <span className="label">TENTATIVAS:</span>{' '}
-          <span>{guesses.length}</span>
+          <span>{sortedGuesses.length}</span>
         </div>
 
         <form onSubmit={handleSubmit}>
