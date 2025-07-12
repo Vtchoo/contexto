@@ -179,15 +179,8 @@ class ContextoStopGame extends ContextoBaseGame {
             throw new Error(`Player ${playerId} is not in the game`)
         }
 
-        try {
-            this.removePlayer(playerId)
-            return { success: true }
-        } catch (error) {
-            return {
-                success: false,
-                error: "Não foi possível sair do jogo no momento"
-            }
-        }
+        this.removePlayer(playerId)
+        return { success: true }
     }
 
     // Get winner info

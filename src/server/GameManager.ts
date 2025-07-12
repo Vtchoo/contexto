@@ -44,16 +44,7 @@ export class GameManager {
   }
 
   removeUserFromGame(userId: string, roomId: string): void {
-    const gameInfo = this.contextoManager.getGameInfo(roomId)
-    if (gameInfo.exists && gameInfo.game) {
-      try {
-        gameInfo.game.removePlayer(userId)
-      } catch (error) {
-        // Player might not be in the game, that's okay
-      }
-    }
-
-    // Use ContextoManager to handle player removal
+    // Use ContextoManager to handle player removal - this will handle the game.removePlayer internally
     this.contextoManager.leaveCurrentGame(userId)
   }
 

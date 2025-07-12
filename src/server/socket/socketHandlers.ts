@@ -336,18 +336,23 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       console.log(`🔌 User disconnected: ${socket.id}`)
 
       if (socketUser) {
-        const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
-        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
-        if (user && currentRoom) {
-          // Notify room about player leaving
-          socket.to(currentRoom).emit('player_left', {
-            userId: socketUser.userId,
-            username: socketUser.username
-          })
+        try {
+          const payload = JWTService.verifyToken(socketUser.token)
+          const user = payload ? userManager.getUserById(payload.userId) : null
+          const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+          if (user && currentRoom) {
+            // Notify room about player leaving
+            socket.to(currentRoom).emit('player_left', {
+              userId: socketUser.userId,
+              username: socketUser.username
+            })
 
-          // Remove user from game
-          gameManager.removeUserFromGame(socketUser.userId, currentRoom)
+            // Remove user from game
+            gameManager.removeUserFromGame(socketUser.userId, currentRoom)
+          }
+        } catch (error) {
+          console.error(`❌ Error handling disconnect for user ${socketUser.userId}:`, error)
+          // Continue with cleanup even if there's an error
         }
       }
     })

@@ -199,15 +199,8 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
             throw new Error(`Player ${playerId} is not in the game`)
         }
 
-        try {
-            this.removePlayer(playerId)
-            return { success: true }
-        } catch (error) {
-            return {
-                success: false,
-                error: "Não foi possível sair do jogo no momento"
-            }
-        }
+        this.removePlayer(playerId)
+        return { success: true }
     }
 
     // Override give up to not end the game (competitive mode)
