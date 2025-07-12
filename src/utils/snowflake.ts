@@ -2,56 +2,88 @@
  * Snowflake ID Generator
  * Generates short, unique, user-friendly IDs for game rooms
  * Format: 8-10 character alphanumeric strings (excluding confusing characters)
+ * Based on Discord Snowflake algorithm with randomized sequence handling
  */
 
 class SnowflakeGenerator {
+    public static readonly MACHINE_ID_BITS = 10
+    public static readonly SEQUENCE_BITS = 12
+    
+    public static readonly MAX_MACHINE_ID = -1 ^ (-1 << SnowflakeGenerator.MACHINE_ID_BITS)
+    public static readonly MAX_SEQUENCE = -1 ^ (-1 << SnowflakeGenerator.SEQUENCE_BITS)
+    
+    public static readonly MACHINE_ID_SHIFT = SnowflakeGenerator.SEQUENCE_BITS
+    public static readonly TIMESTAMP_LEFT_SHIFT = SnowflakeGenerator.SEQUENCE_BITS + SnowflakeGenerator.MACHINE_ID_BITS
+    
     private machineId: number
-    private sequence: number = 0
-    private lastTimestamp: number = 0
+    private lastTimestamp: number = -1
+    private generatedSequences: Set<number> = new Set()
     
     // Use only unambiguous characters (no 0, O, 1, I, l)
     private readonly charset = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
     private readonly base = this.charset.length // 32
     
-    // Epoch start (2025-01-01 00:00:00 UTC) to make IDs shorter
-    private readonly epoch = 1735689600000
+    // Epoch start (2025-07-12 00:00:00 UTC) - today's date to minimize 0 timestamp differences
+    private readonly epoch = 1752307200000
     
     constructor() {
-        // Generate a random machine ID (0-1023)
-        this.machineId = Math.floor(Math.random() * 1024)
+        // Generate a random machine ID (1-MAX_MACHINE_ID) with better distribution
+        // Use crypto random if available, fall back to Math.random
+        const randomValue = typeof crypto !== 'undefined' && crypto.getRandomValues 
+            ? crypto.getRandomValues(new Uint32Array(1))[0] / (0xFFFFFFFF + 1)
+            : Math.random()
+            
+        this.machineId = Math.floor(randomValue * SnowflakeGenerator.MAX_MACHINE_ID) + 1
+        
+        if (this.machineId < 0 || this.machineId > SnowflakeGenerator.MAX_MACHINE_ID) {
+            throw new Error(`Machine ID must be between 0 and ${SnowflakeGenerator.MAX_MACHINE_ID}`)
+        }
+        
+        // Add some random initial sequences to avoid immediate collisions
+        for (let i = 0; i < 5; i++) {
+            this.generatedSequences.add(Math.floor(Math.random() * SnowflakeGenerator.MAX_SEQUENCE))
+        }
     }
     
-    /**
-     * Generate a new Snowflake ID
-     * @returns A short, friendly ID string (8-10 characters)
-     */
-    generate(): string {
-        let timestamp = Date.now()
+    private currentTime(): number {
+        return Date.now()
+    }
+    
+    private generateId(): number {
+        const timestamp = this.currentTime()
         
         if (timestamp < this.lastTimestamp) {
             throw new Error('Clock moved backwards. Refusing to generate id')
         }
         
-        if (timestamp === this.lastTimestamp) {
-            this.sequence = (this.sequence + 1) & 0xFFF // 12 bits
-            if (this.sequence === 0) {
-                // Wait for next millisecond
-                while (timestamp <= this.lastTimestamp) {
-                    timestamp = Date.now()
-                }
-            }
-        } else {
-            this.sequence = 0
+        if (timestamp !== this.lastTimestamp) {
+            this.generatedSequences.clear()
+            this.lastTimestamp = timestamp
         }
         
-        this.lastTimestamp = timestamp
+        let sequence: number
+        while (true) {
+            sequence = Math.floor(Math.random() * (SnowflakeGenerator.MAX_SEQUENCE + 1))
+            if (!this.generatedSequences.has(sequence)) {
+                this.generatedSequences.add(sequence)
+                break
+            }
+        }
         
-        // Build the snowflake: timestamp (41 bits) + machine (10 bits) + sequence (12 bits)
-        const timestampDiff = timestamp - this.epoch
-        const snowflake = (timestampDiff << 22) | (this.machineId << 12) | this.sequence
-        
-        // Convert to base32 string for friendlier format
-        return this.toBase32(snowflake)
+        const id = ((timestamp - this.epoch) << SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) |
+                   (this.machineId << SnowflakeGenerator.MACHINE_ID_SHIFT) |
+                   sequence
+                   
+        return id
+    }
+    
+    /**
+     * Generate a new Snowflake ID
+     * @returns A short, friendly ID string (6-12 characters)
+     */
+    generate(): string {
+        const id = this.generateId()
+        return this.toBase32(id)
     }
     
     /**
@@ -75,8 +107,22 @@ class SnowflakeGenerator {
      */
     extractTimestamp(id: string): Date {
         const num = this.fromBase32(id)
-        const timestamp = (num >> 22) + this.epoch
+        const timestamp = (num >> SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) + this.epoch
         return new Date(timestamp)
+    }
+    
+    /**
+     * Parse a snowflake ID into its components
+     * @param id - The snowflake ID string to parse
+     * @returns Object containing timestamp, machineId, and sequence
+     */
+    parseSnowflake(id: string): { timestamp: number; machineId: number; sequence: number } {
+        const num = this.fromBase32(id)
+        const timestamp = (num >> SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) + this.epoch
+        const machineId = (num >> SnowflakeGenerator.MACHINE_ID_SHIFT) & SnowflakeGenerator.MAX_MACHINE_ID
+        const sequence = num & SnowflakeGenerator.MAX_SEQUENCE
+        
+        return { timestamp, machineId, sequence }
     }
     
     /**
@@ -114,6 +160,23 @@ class SnowflakeGenerator {
         }
     }
 }
+
+/**
+ * Parse a snowflake ID into its components (standalone function)
+ * @param snowflakeId - The numeric snowflake ID
+ * @param epoch - The epoch timestamp used when generating the ID
+ * @returns Object containing timestamp, machineId, and sequence
+ */
+export function parseSnowflakeId(snowflakeId: number, epoch: number): { timestamp: number; machineId: number; sequence: number } {
+    const timestamp = (snowflakeId >> SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) + epoch
+    const machineId = (snowflakeId >> SnowflakeGenerator.MACHINE_ID_SHIFT) & SnowflakeGenerator.MAX_MACHINE_ID
+    const sequence = snowflakeId & SnowflakeGenerator.MAX_SEQUENCE
+    
+    return { timestamp, machineId, sequence }
+}
+
+// Export the class for testing
+export { SnowflakeGenerator }
 
 // Export a singleton instance
 export const snowflakeGenerator = new SnowflakeGenerator()
