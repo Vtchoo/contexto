@@ -1,3 +1,4 @@
+import 'reflect-metadata'
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
@@ -5,6 +6,7 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import compression from 'compression'
+import createConnection from '../database'
 import snowflakeGenerator from '../utils/snowflake'
 import { GameManager } from './GameManager'
 import { UserManager } from './UserManager'
@@ -83,13 +85,28 @@ setupSocketHandlers(io, gameManager, userManager)
 
 const PORT = process.env.PORT || 3001
 
-server.listen(PORT, () => {
-  console.log(`🚀 Contexto server running on port ${PORT}`)
-  console.log(`🎮 Game API available at http://localhost:${PORT}/api/game`)
-  console.log(`🏠 Rooms API available at http://localhost:${PORT}/api/rooms`)
-  console.log(`👤 Users API available at http://localhost:${PORT}/api/users`)
-  console.log(`⚡ WebSocket server ready for real-time gaming`)
-})
+async function startServer() {
+  try {
+    // Initialize database connection
+    console.log('🔄 Initializing database connection...')
+    await createConnection()
+    console.log('✅ Database connected successfully')
+
+    server.listen(PORT, () => {
+      console.log(`🚀 Contexto server running on port ${PORT}`)
+      console.log(`🎮 Game API available at http://localhost:${PORT}/api/game`)
+      console.log(`🏠 Rooms API available at http://localhost:${PORT}/api/rooms`)
+      console.log(`👤 Users API available at http://localhost:${PORT}/api/users`)
+      console.log(`⚡ WebSocket server ready for real-time gaming`)
+    })
+  } catch (error) {
+    console.error('❌ Failed to start server:', error)
+    process.exit(1)
+  }
+}
+
+// Start the server
+startServer()
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
