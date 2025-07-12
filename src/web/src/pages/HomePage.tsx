@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
-import { strings } from '../constants/strings'
 import { useGame } from '../contexts/GameContext'
 
 const Container = styled.div`
@@ -10,30 +8,28 @@ const Container = styled.div`
   flex-direction: column;
   align-items: center;
   padding: 2rem;
-`
-
-const WelcomeSection = styled.div`
-  text-align: center;
-  margin-bottom: 3rem;
   max-width: 800px;
+  margin: 0 auto;
 `
 
 const Title = styled.h1`
   color: var(--text-color);
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   font-size: 3rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  text-align: center;
 `
 
 const Subtitle = styled.p`
   color: var(--secondary-text);
-  font-size: 1.2rem;
-  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  margin-bottom: 3rem;
+  text-align: center;
   line-height: 1.6;
 `
 
-const HowToPlay = styled.div`
+const QuickStartSection = styled.div`
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -42,70 +38,151 @@ const HowToPlay = styled.div`
   box-shadow: 0 2px 8px var(--shadow);
 `
 
-const HowToPlayTitle = styled.h2`
+const SectionTitle = styled.h2`
   color: var(--text-color);
   margin-bottom: 1rem;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+  font-weight: 600;
 `
 
-const HowToPlayText = styled.p`
+const QuickPlayInput = styled.input`
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--input-bg);
+  color: var(--text-color);
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    border-color: var(--button-bg);
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--secondary-text);
+  }
+`
+
+const QuickPlayNote = styled.p`
   color: var(--secondary-text);
-  line-height: 1.6;
+  font-size: 0.9rem;
   margin-bottom: 1rem;
+  line-height: 1.4;
+`
+
+const CreateRoomSection = styled.div`
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px var(--shadow);
 `
 
 const GameModeSelector = styled.div`
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
 `
 
 const ModeButton = styled.button<{ active: boolean }>`
-  background: ${props => props.active ? 'var(--button-bg)' : 'var(--card-bg)'};
+  background: ${props => props.active ? 'var(--button-bg)' : 'var(--input-bg)'};
   color: ${props => props.active ? 'var(--button-text)' : 'var(--text-color)'};
   border: 2px solid ${props => props.active ? 'var(--button-bg)' : 'var(--border-color)'};
-  padding: 1rem 1.5rem;
+  padding: 0.75rem;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 500;
   transition: all 0.2s ease;
   cursor: pointer;
+  text-align: center;
 
   &:hover {
     border-color: var(--button-bg);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px var(--shadow);
+    transform: translateY(-1px);
   }
 `
 
-const StartButton = styled.button`
+const CreateRoomButton = styled.button`
+  width: 100%;
   background: var(--green);
   color: white;
-  padding: 1.25rem 2.5rem;
+  padding: 1rem;
   border-radius: 8px;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
 
   &:hover:not(:disabled) {
     background: #218838;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
   }
 
   &:disabled {
     background: var(--secondary-text);
     cursor: not-allowed;
     transform: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+`
+
+const JoinRoomSection = styled.div`
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px var(--shadow);
+`
+
+const JoinRoomInput = styled.input`
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--input-bg);
+  color: var(--text-color);
+  margin-bottom: 1rem;
+  transition: border-color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+
+  &:focus {
+    border-color: var(--button-bg);
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--secondary-text);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+`
+
+const JoinRoomButton = styled.button`
+  width: 100%;
+  background: var(--button-bg);
+  color: var(--button-text);
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--button-hover);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    background: var(--secondary-text);
+    cursor: not-allowed;
+    transform: none;
   }
 `
 
@@ -117,45 +194,55 @@ const DemoGame = styled.div`
 type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
 
 function HomePage() {
-  const navigate = useNavigate()
   const [selectedMode, setSelectedMode] = useState<GameMode>('default')
   const [showDemo, setShowDemo] = useState(false)
-  const { createGame, guesses, loading, gameFinished, makeGuess, user, isConnected, currentRoom } = useGame()
+  const [quickPlayWord, setQuickPlayWord] = useState('')
+  const [roomIdInput, setRoomIdInput] = useState('')
+  const { createGame, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected } = useGame()
 
-  const handleStartGame = async () => {
+  const handleQuickPlay = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!quickPlayWord.trim()) return
+
     try {
-      const gameId = await createGame(selectedMode)
+      // Create a new cooperative game and make the first guess
+      await createGame('default') // Using cooperative mode for quick play
       setShowDemo(true)
+      // Make the first guess
+      if (quickPlayWord.trim()) {
+        makeGuess(quickPlayWord.trim())
+      }
     } catch (error) {
-      console.error('Failed to start game:', error)
+      console.error('Failed to start quick play:', error)
     }
   }
 
-  const handleDemoGuess = (word: string) => {
-    makeGuess(word)
+  const handleCreateRoom = async () => {
+    try {
+      await createGame(selectedMode)
+      setShowDemo(true)
+    } catch (error) {
+      console.error('Failed to create room:', error)
+    }
+  }
+
+  const handleJoinRoom = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!roomIdInput.trim()) return
+
+    try {
+      await joinRoom(roomIdInput.trim().toUpperCase())
+      setShowDemo(true)
+    } catch (error) {
+      console.error('Failed to join room:', error)
+    }
   }
 
   const gameModes = [
-    {
-      key: 'default' as GameMode,
-      name: strings.modes.classic,
-      description: strings.modeDescriptions.classic
-    },
-    {
-      key: 'competitive' as GameMode,
-      name: strings.modes.cooperative,
-      description: strings.modeDescriptions.cooperative
-    },
-    {
-      key: 'battle-royale' as GameMode,
-      name: strings.modes.battleRoyale,
-      description: strings.modeDescriptions.battleRoyale
-    },
-    {
-      key: 'stop' as GameMode,
-      name: strings.modes.stop,
-      description: strings.modeDescriptions.stop
-    }
+    { key: 'default' as GameMode, name: 'Clássico', description: 'Jogo solo tradicional' },
+    { key: 'competitive' as GameMode, name: 'Competitivo', description: 'Joguem juntos' },
+    { key: 'battle-royale' as GameMode, name: 'Battle Royale', description: 'Competição eliminatória' },
+    { key: 'stop' as GameMode, name: 'Stop', description: 'Primeiro a acertar ganha' }
   ]
 
   if (showDemo) {
@@ -163,9 +250,8 @@ function HomePage() {
       <Container>
         <DemoGame>
           <GameInterface
-            roomId={currentRoom || undefined}
             guesses={guesses}
-            onGuess={handleDemoGuess}
+            onGuess={makeGuess}
             gameFinished={gameFinished}
             loading={loading}
           />
@@ -176,28 +262,29 @@ function HomePage() {
 
   return (
     <Container>
-      <WelcomeSection>
-        <Title>CONTEXTO</Title>
-        <Subtitle>
-          {strings.modeDescriptions.classic}. As palavras são classificadas por um algoritmo de IA de acordo com sua similaridade com a palavra-alvo.
-        </Subtitle>
-        
-        <HowToPlay>
-          <HowToPlayTitle>Como jogar</HowToPlayTitle>
-          <HowToPlayText>
-            🎯 <strong>Objetivo:</strong> Encontre a palavra secreta usando pistas de contexto
-          </HowToPlayText>
-          <HowToPlayText>
-            📊 <strong>Classificação:</strong> As palavras são classificadas por similaridade semântica (1 = palavra secreta)
-          </HowToPlayText>
-          <HowToPlayText>
-            🎨 <strong>Cores:</strong> Verde (muito próximo), Amarelo (próximo), Vermelho (distante)
-          </HowToPlayText>
-          <HowToPlayText>
-            ♾️ <strong>Tentativas:</strong> Você tem tentativas ilimitadas!
-          </HowToPlayText>
-        </HowToPlay>
+      <Title>CONTEXTO</Title>
+      <Subtitle>
+        Encontre a palavra secreta usando pistas de contexto semântico. Quanto menor o número, mais próximo você está!
+      </Subtitle>
 
+      <QuickStartSection>
+        <SectionTitle>🚀 Jogo Rápido</SectionTitle>
+        <QuickPlayNote>
+          Digite uma palavra para começar imediatamente um jogo cooperativo
+        </QuickPlayNote>
+        <form onSubmit={handleQuickPlay}>
+          <QuickPlayInput
+            type="text"
+            placeholder="Digite uma palavra para começar..."
+            value={quickPlayWord}
+            onChange={(e) => setQuickPlayWord(e.target.value)}
+            disabled={!isConnected || loading}
+          />
+        </form>
+      </QuickStartSection>
+
+      <CreateRoomSection>
+        <SectionTitle>🎮 Criar Nova Sala</SectionTitle>
         <GameModeSelector>
           {gameModes.map(mode => (
             <ModeButton
@@ -205,22 +292,47 @@ function HomePage() {
               active={selectedMode === mode.key}
               onClick={() => setSelectedMode(mode.key)}
             >
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                  {mode.name}
-                </div>
-                <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-                  {mode.description}
-                </div>
+              <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                {mode.name}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                {mode.description}
               </div>
             </ModeButton>
           ))}
         </GameModeSelector>
+        <CreateRoomButton onClick={handleCreateRoom} disabled={!isConnected || loading}>
+          {loading ? 'Criando sala...' : 'Criar Sala'}
+        </CreateRoomButton>
+      </CreateRoomSection>
 
-        <StartButton onClick={handleStartGame} disabled={!isConnected || loading}>
-          {loading ? 'Criando jogo...' : isConnected ? 'Começar a jogar' : 'Conectando...'}
-        </StartButton>
-      </WelcomeSection>
+      <JoinRoomSection>
+        <SectionTitle>🔗 Entrar em Sala</SectionTitle>
+        <form onSubmit={handleJoinRoom}>
+          <JoinRoomInput
+            type="text"
+            placeholder="Digite o ID da sala (ex: AB12CD)"
+            value={roomIdInput}
+            onChange={(e) => setRoomIdInput(e.target.value)}
+            disabled={!isConnected || loading}
+            maxLength={6}
+          />
+          <JoinRoomButton type="submit" disabled={!isConnected || loading || !roomIdInput.trim()}>
+            {loading ? 'Entrando...' : 'Entrar'}
+          </JoinRoomButton>
+        </form>
+      </JoinRoomSection>
+      
+      {!isConnected && (
+        <div style={{ 
+          color: 'var(--secondary-text)', 
+          textAlign: 'center', 
+          marginTop: '1rem',
+          fontSize: '0.9rem'
+        }}>
+          Conectando ao servidor...
+        </div>
+      )}
     </Container>
   )
 }
