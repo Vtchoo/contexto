@@ -200,7 +200,7 @@ function HomePage() {
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { createGame, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId } = useGame()
+  const { createGame, quickPlay, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId } = useGame()
 
   // Handle URL room parameter
   useEffect(() => {
@@ -226,13 +226,9 @@ function HomePage() {
     if (!quickPlayWord.trim()) return
 
     try {
-      // Create a new cooperative game and make the first guess
-      await createGame('default') // Using cooperative mode for quick play
+      await quickPlay(quickPlayWord.trim())
       setShowDemo(true)
-      // Make the first guess
-      if (quickPlayWord.trim()) {
-        makeGuess(quickPlayWord.trim())
-      }
+      setQuickPlayWord('') // Clear the input after successful quick play
     } catch (error) {
       console.error('Failed to start quick play:', error)
     }

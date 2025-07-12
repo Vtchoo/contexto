@@ -15,6 +15,7 @@ interface GameContextType {
   connect: () => void
   disconnect: () => void
   createGame: (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number) => Promise<string>
+  quickPlay: (word: string) => Promise<void>
   joinRoom: (roomId: string) => Promise<void>
   leaveRoom: () => void
   makeGuess: (word: string) => Promise<void>
@@ -143,6 +144,25 @@ export function GameProvider({ children }: GameProviderProps) {
     }
   }
 
+  const quickPlay = async (word: string): Promise<void> => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      // Create a default game
+      await createGame('default')
+
+      if (socket && isConnected) {
+        socket.emit('make_guess', { word })
+      }
+    } catch (err) {
+      setError('Falha ao iniciar jogo rápido')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const joinRoom = async (roomId: string) => {
     if (socket && isConnected) {
       socket.emit('join_room', { roomId })
@@ -202,6 +222,7 @@ export function GameProvider({ children }: GameProviderProps) {
         connect,
         disconnect,
         createGame,
+        quickPlay,
         joinRoom,
         leaveRoom,
         makeGuess,
