@@ -14,7 +14,7 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
 
     constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
         super(playerId, manager, gameIdOrDate)
-        this.started = false // Competitive games start unstarted
+        this.started = true
         // Initialize empty guess array for the first player
         this.playerGuesses.set(playerId, [])
     }
