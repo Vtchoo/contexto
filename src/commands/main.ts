@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js"
+import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
 import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
 import { getBarColor, getBarWidth, getTodaysGameId } from "../game/utils/misc"
@@ -87,7 +87,7 @@ class MainCommand implements ICommand {
         }
     }
 
-    private async handleDefaultGame(interaction: any, game: ContextoDefaultGame, word: string | null, playerId: string, justStarted: boolean) {
+    private async handleDefaultGame(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoDefaultGame, word: string | null, playerId: string, justStarted: boolean) {
         if (game.finished) {
             await interaction.reply({
                 content: `O jogo ${game.id} já foi finalizado. Você pode jogar novamente com o comando /c <palavra>`,
@@ -127,6 +127,17 @@ class MainCommand implements ICommand {
                 }
 
                 const closestGuesses = game.getClosestGuesses(playerId)
+                
+                // Check if this guess finished the game
+                if (result.distance === 0) {
+                    // Send private response first
+                    await this.sendGameResponse(interaction, game, result, closestGuesses, 'default')
+                    
+                    // Then broadcast the win to the channel
+                    await this.broadcastCoopGameResults(interaction, game, playerId)
+                    return
+                }
+                
                 return this.sendGameResponse(interaction, game, result, closestGuesses, 'default')
             }
         }
@@ -137,7 +148,7 @@ class MainCommand implements ICommand {
         })
     }
 
-    private async handleCompetitiveGame(interaction: any, game: ContextoCompetitiveGame, word: string | null, playerId: string, justStarted: boolean) {
+    private async handleCompetitiveGame(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoCompetitiveGame, word: string | null, playerId: string, justStarted: boolean) {
         // Competitive games never finish, so no need to check game.finished
 
         if (word) {
@@ -190,7 +201,7 @@ class MainCommand implements ICommand {
         })
     }
 
-    private async handleStopGame(interaction: any, game: ContextoStopGame, word: string | null, playerId: string) {
+    private async handleStopGame(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoStopGame, word: string | null, playerId: string) {
         if (!word) {
             await interaction.reply({
                 content: `⚡ **Sala Stop**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}${this.formatGameDate(game.gameId)}\n**Status:** ${game.started ? 'Em andamento' : 'Aguardando início'}\n**Jogadores:** ${game.getPlayerCount()}\n\n${!game.started ? '⏳ **Aguardando início:** Use \`/start\` para iniciar o jogo.\n\n' : '⚡ **Jogo ativo!** Use \`/c <palavra>\` para fazer suas tentativas.\n\n'}⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!\n\nUse \`/room\` para ver informações da sala.`,
@@ -272,7 +283,7 @@ class MainCommand implements ICommand {
         }
     }
 
-    private async sendGameResponse(interaction: any, game: ContextoDefaultGame | ContextoCompetitiveGame, result: any, closestGuesses: any[], mode: 'default' | 'competitive', playerId?: string) {
+    private async sendGameResponse(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoDefaultGame | ContextoCompetitiveGame, result: any, closestGuesses: any[], mode: 'default' | 'competitive', playerId?: string) {
         if (closestGuesses.length > 0) {
             const guessesFormatting = [result, ...closestGuesses].map(guess => ({
                 text: guess.word,
@@ -341,7 +352,7 @@ class MainCommand implements ICommand {
         })
     }
 
-    private async broadcastStopGameResults(interaction: any, game: ContextoStopGame) {
+    private async broadcastStopGameResults(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoStopGame) {
         const leaderboard = game.getLeaderboard()
         const winner = game.getWinner()
         
@@ -382,7 +393,36 @@ class MainCommand implements ICommand {
         })
     }
 
-    private async sendStopGameResponse(interaction: any, game: ContextoStopGame, result: any, closestGuesses: any[], playerId: string, additionalText?: string) {
+    private async broadcastCoopGameResults(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoDefaultGame, winnerId: string) {
+        const totalGuesses = game.getGuessCount()
+        const playerCount = game.getPlayerCount()
+        
+        let resultsText = `🎉 **Jogo Cooperativo #${game.gameId} Concluído!**\n\n`
+        resultsText += `🎯 **Descoberto por:** <@${winnerId}>\n`
+        resultsText += `🤝 **Esforço colaborativo:** ${totalGuesses} tentativas${playerCount > 1 ? ` (${playerCount} jogadores)` : ''}\n\n`
+
+        // Check if this is today's game to avoid spoiling the answer
+        const todaysGameId = getTodaysGameId()
+        if (game.gameId !== todaysGameId) {
+            // Try to find the winning word (distance 0) from the guesses
+            const winningGuess = game.getClosestGuesses(winnerId)[0] // The closest guess should be the winning one with distance 0
+            if (winningGuess && winningGuess.distance === 0) {
+                resultsText += `💡 **Resposta:** ${winningGuess.word}\n\n`
+            }
+        }
+
+        const gameDate = this.formatGameDate(game.gameId)
+        resultsText += `📅 **Jogo:** #${game.gameId}${gameDate}\n`
+        resultsText += `🎮 **Jogue novamente:** \`/c <palavra>\``
+
+        // Send to the channel (not ephemeral)
+        await interaction.followUp({
+            content: resultsText,
+            ephemeral: false
+        })
+    }
+
+    private async sendStopGameResponse(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoStopGame, result: any, closestGuesses: any[], playerId: string, additionalText?: string) {
         if (closestGuesses.length > 0) {
             const guessesFormatting = [result, ...closestGuesses].map(guess => ({
                 text: guess.word,
