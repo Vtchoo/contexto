@@ -119,7 +119,7 @@ export function GameProvider({ children }: GameProviderProps) {
     setError(null)
     
     try {
-      const response = await gameApi.createGame(type)
+      const response = await gameApi.createGame(type, gameId)
       
       // Join the game room via socket
       if (socket && isConnected) {

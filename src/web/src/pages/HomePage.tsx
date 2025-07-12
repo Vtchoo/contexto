@@ -239,10 +239,10 @@ function HomePage() {
   }
 
   const gameModes = [
-    { key: 'default' as GameMode, name: 'Clássico', description: 'Jogo solo tradicional' },
+    { key: 'default' as GameMode, name: 'Clássico', description: 'Jogo tradicional ou cooperativo' },
     { key: 'competitive' as GameMode, name: 'Competitivo', description: 'Joguem juntos' },
-    { key: 'battle-royale' as GameMode, name: 'Battle Royale', description: 'Competição eliminatória' },
-    { key: 'stop' as GameMode, name: 'Stop', description: 'Primeiro a acertar ganha' }
+    { key: 'stop' as GameMode, name: 'Stop', description: 'Primeiro a acertar ganha' },
+    { key: 'battle-royale' as GameMode, name: 'Battle Royale', description: '"Alguém já usou essa palavra"' }
   ]
 
   if (showDemo) {
