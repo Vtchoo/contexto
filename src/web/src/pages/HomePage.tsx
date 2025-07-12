@@ -200,12 +200,12 @@ function HomePage() {
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { createGame, quickPlay, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId, currentGameMode } = useGame()
+  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess } = useGame()
 
   // Handle URL room parameter
   useEffect(() => {
     const roomParam = searchParams.get('room')
-    if (roomParam && isConnected && !currentRoom && !showDemo) {
+    if (roomParam && isConnected && !currentGame?.roomId && !showDemo) {
       // Auto-join room from URL parameter
       joinRoom(roomParam.toUpperCase())
         .then(() => {
@@ -219,7 +219,7 @@ function HomePage() {
           console.error('Failed to join room from URL:', error)
         })
     }
-  }, [searchParams, isConnected, currentRoom, showDemo, joinRoom, setSearchParams])
+  }, [searchParams, isConnected, currentGame?.roomId, showDemo, joinRoom, setSearchParams])
 
   const handleQuickPlay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -267,12 +267,12 @@ function HomePage() {
       <Container>
         <DemoGame>
           <GameInterface
-            gameId={currentGameId ? parseInt(currentGameId) : undefined}
-            roomId={currentRoom || undefined}
-            gameMode={currentGameMode}
-            guesses={guesses}
+            gameId={currentGame?.gameId ? parseInt(currentGame.gameId) : undefined}
+            roomId={currentGame?.roomId}
+            gameMode={currentGame?.gameMode}
+            guesses={currentGame?.guesses || []}
             onGuess={makeGuess}
-            gameFinished={gameFinished}
+            gameFinished={currentGame?.finished || false}
             loading={loading}
           />
         </DemoGame>

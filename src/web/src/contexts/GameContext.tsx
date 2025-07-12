@@ -1,18 +1,22 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { gameApi, userApi, User, Guess } from '../api/gameApi'
+import { gameApi, User, Guess } from '../api/gameApi'
+
+interface CurrentGame {
+  roomId: string
+  gameId: string
+  gameMode: 'default' | 'competitive' | 'battle-royale' | 'stop'
+  guesses: Guess[]
+  finished: boolean
+}
 
 interface GameContextType {
   user: User | null
   socket: Socket | null
-  currentRoom: string | null
-  currentGameId: string | null
-  currentGameMode: 'default' | 'competitive' | 'battle-royale' | 'stop' | null
+  currentGame: CurrentGame | null
   isConnected: boolean
   loading: boolean
   error: string | null
-  guesses: Guess[]
-  gameFinished: boolean
   connect: () => void
   disconnect: () => void
   createGame: (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number) => Promise<string>
@@ -32,14 +36,10 @@ interface GameProviderProps {
 export function GameProvider({ children }: GameProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
-  const [currentRoom, setCurrentRoom] = useState<string | null>(null)
-  const [currentGameId, setCurrentGameId] = useState<string | null>(null)
-  const [currentGameMode, setCurrentGameMode] = useState<'default' | 'competitive' | 'battle-royale' | 'stop' | null>(null)
+  const [currentGame, setCurrentGame] = useState<CurrentGame | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [guesses, setGuesses] = useState<Guess[]>([])
-  const [gameFinished, setGameFinished] = useState(false)
 
   const connect = () => {
     if (socket?.connected) return
@@ -66,39 +66,67 @@ export function GameProvider({ children }: GameProviderProps) {
     })
 
     newSocket.on('room_joined', (data) => {
-      setCurrentRoom(data.roomId)
-      setCurrentGameId(data.gameId)
+      setCurrentGame(prev => ({
+        roomId: data.roomId,
+        gameId: data.gameId,
+        gameMode: prev?.gameMode || 'default',
+        guesses: prev?.guesses || [],
+        finished: prev?.finished || false
+      }))
     })
 
     newSocket.on('room_left', () => {
-      setCurrentRoom(null)
-      setCurrentGameId(null)
+      setCurrentGame(null)
     })
 
     newSocket.on('game_update', (data) => {
-      if (data.guesses) setGuesses(data.guesses)
-      if (data.gameFinished !== undefined) setGameFinished(data.gameFinished)
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          guesses: data.guesses || prev.guesses,
+          finished: data.gameFinished !== undefined ? data.gameFinished : prev.finished
+        }
+      })
     })
 
     newSocket.on('guess_result', (data) => {
       // Handle our own guess result
-      setGuesses(prev => [...prev, data.guess])
-      setGameFinished(data.gameFinished || false)
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          guesses: [...prev.guesses, data.guess],
+          finished: data.gameFinished || false
+        }
+      })
       setLoading(false)
     })
 
     newSocket.on('player_guess', (data) => {
       // Handle other players' guesses in multiplayer
-      setGuesses(prev => [...prev, {
-        word: data.word,
-        distance: data.distance,
-        addedBy: data.playerId,
-        error: data.error
-      }])
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          guesses: [...prev.guesses, {
+            word: data.word,
+            distance: data.distance,
+            addedBy: data.playerId,
+            error: data.error
+          }]
+        }
+      })
     })
 
     newSocket.on('game_finished', (data) => {
-      setGameFinished(true)
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          finished: true
+        }
+      })
       if (data.winner) {
         // Handle game completion
         console.log(`Game finished! Winner: ${data.winner}`)
@@ -117,9 +145,7 @@ export function GameProvider({ children }: GameProviderProps) {
       socket.disconnect()
       setSocket(null)
       setIsConnected(false)
-      setCurrentRoom(null)
-      setCurrentGameId(null)
-      setCurrentGameMode(null)
+      setCurrentGame(null)
     }
   }
 
@@ -135,9 +161,14 @@ export function GameProvider({ children }: GameProviderProps) {
         socket.emit('join_room', { roomId: response.roomId })
       }
       
-      setGuesses([])
-      setGameFinished(false)
-      setCurrentGameMode(type) // Store the game mode
+      // Initialize the game state
+      setCurrentGame({
+        roomId: response.roomId.toString(),
+        gameId: response.gameId?.toString() || response.roomId.toString(),
+        gameMode: type,
+        guesses: [],
+        finished: false
+      })
       
       return response.roomId.toString()
     } catch (err) {
@@ -174,13 +205,13 @@ export function GameProvider({ children }: GameProviderProps) {
   }
 
   const leaveRoom = () => {
-    if (socket && isConnected && currentRoom) {
+    if (socket && isConnected && currentGame?.roomId) {
       socket.emit('leave_room')
     }
   }
 
   const makeGuess = async (word: string) => {
-    if (!currentRoom || loading) return
+    if (!currentGame?.roomId || loading) return
     
     setLoading(true)
     setError(null)
@@ -191,7 +222,7 @@ export function GameProvider({ children }: GameProviderProps) {
         socket.emit('make_guess', { word })
       } else {
         // Fallback to HTTP API
-        await gameApi.makeGuess(currentRoom, word)
+        await gameApi.makeGuess(currentGame.roomId, word)
         // The server will broadcast the update via socket
       }
     } catch (err) {
@@ -216,14 +247,10 @@ export function GameProvider({ children }: GameProviderProps) {
       value={{
         user,
         socket,
-        currentRoom,
-        currentGameId,
-        currentGameMode,
+        currentGame,
         isConnected,
         loading,
         error,
-        guesses,
-        gameFinished,
         connect,
         disconnect,
         createGame,
