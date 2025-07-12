@@ -44,24 +44,12 @@ export class GameManager {
     if (!gameInfo.exists || !gameInfo.game) {
       throw new Error('Game not found')
     }
-
-    const game = gameInfo.game
-    try {
-      game.addPlayer(userId)
-    } catch (error) {
-      // Player might already be in the game, that's okay
-    }
-
-    // Use ContextoManager to track the player's current game
-    // This enforces one-game-per-user rule
-    const currentGame = this.contextoManager.getCurrentPlayerGame(userId)
-    if (currentGame) {
-      this.contextoManager.leaveCurrentGame(userId)
-    }
     
-    // Set the player's current game in ContextoManager
-    // Note: We manually update the playerGames mapping since we're managing games externally
-    (this.contextoManager as any).playerGames.set(userId, roomId)
+    this.contextoManager.joinGame(userId, roomId)
+  }
+
+  joinGame(userId: string, roomId: string): Game {
+    return this.contextoManager.joinGame(userId, roomId)
   }
 
   removeUserFromGame(userId: string, roomId: string): void {
