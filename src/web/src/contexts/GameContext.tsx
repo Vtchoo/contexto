@@ -153,11 +153,6 @@ function useGameHook() {
     try {
       const response = await gameApi.createGame(type, gameId)
 
-      // Join the game room via socket
-      if (socket && isConnected) {
-        // socket.emit('join_room', { roomId: response.roomId })
-      }
-
       // Initialize the game state
       const initialGame = {
         roomId: response.roomId.toString(),
