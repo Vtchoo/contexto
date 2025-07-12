@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { gameApi, User, Guess } from '../api/gameApi'
+import { gameApi, userApi, User, Guess } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
 
 interface CurrentGame {
@@ -18,31 +18,76 @@ function useGameHook() {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [currentGame, setCurrentGame] = useState<CurrentGame | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const connect = () => {
-    if (socket?.connected) return
+  // Initialize user first, then connect socket
+  const initializeApp = async () => {
+    try {
+      console.log('Initializing user...')
+      const userData = await userApi.initUser()
+      setUser(userData)
+      setIsInitialized(true)
+      console.log('User initialized:', userData)
+      
+      // Only connect socket after user is initialized
+      // connect()
+      if (userData.currentRoom) {
 
+      }
+    } catch (err) {
+      console.error('Failed to initialize user:', err)
+      setError('Falha ao inicializar usuário')
+    }
+  }
+
+  useEffect(() => {
+    if (!user)
+      return;
+    
+    connect()
+
+    return () => {
+      if (socket) {
+        socket.disconnect()
+        setSocket(null)
+        setIsConnected(false)
+        setCurrentGame(null)
+      }
+    }
+  }, [user])
+
+  const connect = () => {
+    if (socket?.connected || !isInitialized) return
+
+    console.log('Connecting socket...')
     const newSocket = io('http://localhost:3001', {
-      withCredentials: true,
+      withCredentials: true, // This ensures cookies are sent
     })
 
     newSocket.on('connect', () => {
+      console.log('Socket connected')
       setIsConnected(true)
-
-      // Authenticate using cookies (no need to send token manually)
-      newSocket.emit('auth', {})
+      
+      // Authenticate using cookies only
+      // newSocket.emit('auth')
     })
 
-    newSocket.on('disconnect', () => {
+    newSocket.on('disconnect', (reason) => {
       setIsConnected(false)
+      console.log('Socket disconnected', reason)
     })
 
-    newSocket.on('auth_success', (data) => {
-      setUser(data.user)
-      // Token is now handled via cookies, no need for localStorage
-    })
+    // newSocket.on('auth_success', (data) => {
+    //   console.log('Socket authentication successful for user:', data.user.id)
+    //   // User data should be the same as from HTTP API
+    // })
+
+    // newSocket.on('auth_error', (data) => {
+    //   console.error('Socket authentication failed:', data.error)
+    //   setError('Falha na autenticação do socket')
+    // })
 
     newSocket.on('room_joined', (data) => {
       console.log('Room joined event:', data) // Debug log
@@ -146,6 +191,11 @@ function useGameHook() {
   }
 
   const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number): Promise<string> => {
+    if (!isInitialized) {
+      setError('Aplicação não foi inicializada')
+      throw new Error('Application not initialized')
+    }
+
     setLoading(true)
     setError(null)
 
@@ -165,11 +215,11 @@ function useGameHook() {
       console.log('Creating game with initial state:', initialGame) // Debug log
       setCurrentGame(initialGame)
 
-      // Join the room via socket to ensure the socket connection knows about it
-      if (socket && isConnected) {
-        console.log('Joining room via socket:', response.roomId) // Debug log
-        socket.emit('join_room', { roomId: response.roomId })
-      }
+      // // Join the room via socket to ensure the socket connection knows about it
+      // if (socket && isConnected) {
+      //   console.log('Joining room via socket:', response.roomId) // Debug log
+      //   socket.emit('join_room', { roomId: response.roomId })
+      // }
 
       return response.roomId.toString()
     } catch (err) {
@@ -181,6 +231,11 @@ function useGameHook() {
   }
 
   const quickPlay = async (word: string): Promise<void> => {
+    if (!isInitialized) {
+      setError('Aplicação não foi inicializada')
+      throw new Error('Application not initialized')
+    }
+
     setLoading(true)
     setError(null)
 
@@ -200,9 +255,11 @@ function useGameHook() {
   }
 
   const joinRoom = async (roomId: string) => {
-    if (socket && isConnected) {
-      socket.emit('join_room', { roomId })
+    if (!isInitialized || !socket || !isConnected) {
+      setError('Aplicação não foi inicializada ou socket não conectado')
+      return
     }
+    socket.emit('join_room', { roomId })
   }
 
   const leaveRoom = () => {
@@ -212,7 +269,9 @@ function useGameHook() {
   }
 
   const makeGuess = async (word: string) => {
-    if (!currentGame?.roomId || loading) return
+    console.log('Making guess:', word) // Debug log
+    console.log(currentGame, 'loading:', loading, 'isInitialized:', isInitialized) // Debug log
+    if (!currentGame?.roomId || loading || !isInitialized) return
 
     setLoading(true)
     setError(null)
@@ -238,8 +297,9 @@ function useGameHook() {
     console.log('currentGame:', currentGame) // Debug log
     console.log('socket connected:', socket?.connected) // Debug log
     console.log('isConnected:', isConnected) // Debug log
+    console.log('isInitialized:', isInitialized) // Debug log
     
-    if (!currentGame?.roomId || !socket || !isConnected) {
+    if (!currentGame?.roomId || !socket || !isConnected || !isInitialized) {
       console.log('startGame failed - missing requirements') // Debug log
       setError('Não é possível iniciar o jogo')
       return
@@ -253,9 +313,9 @@ function useGameHook() {
     setError(null)
   }
 
-  // Auto-connect on mount
+  // Initialize app on mount
   useEffect(() => {
-    connect()
+    initializeApp()
     return () => disconnect()
   }, [])
 
@@ -264,6 +324,7 @@ function useGameHook() {
     socket,
     currentGame,
     isConnected,
+    isInitialized,
     loading,
     error,
     connect,

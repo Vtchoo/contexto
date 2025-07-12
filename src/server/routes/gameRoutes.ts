@@ -20,20 +20,22 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
   router.post('/create', async (req: Request, res: Response) => {
     try {
       const { type, gameId } = req.body
-      const token = req.userToken!
 
       if (!['default', 'competitive', 'battle-royale', 'stop'].includes(type)) {
         return res.status(400).json({ error: 'Invalid game type' })
       }
 
-      const roomId = gameManager.createGame(type, req.user.id, gameId)
+      const user = userManager.getUserById(req.user.id)
+
+      if (!user) {
+        return res.status(401).json({ error: 'User not authenticated' })
+      }
+
+      const roomId = gameManager.createGame(type, user.id, gameId)
       const game = gameManager.getGame(roomId)
 
       // Update user's current room
-      const user = userManager.getUserById(req.user.id)
-      if (user) {
-        user.joinRoom(roomId)
-      }
+      user.joinRoom(roomId)
 
       res.json({
         roomId,

@@ -12,62 +12,97 @@ interface SocketUser {
 }
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
-  
+
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 User connected: ${socket.id}`)
-    
+
     let socketUser: SocketUser | null = null
 
-    // Authentication handler
-    socket.on('auth', (data: { token?: string }) => {
+    const cookies = socket.handshake.headers.cookie
+    console.log('Socket auth cookies:', cookies)
+
+    if (!cookies) {
+      socket.emit('auth_error', { error: 'No authentication cookies found' })
+      return
+    }
+
+    // Parse cookies to find contexto_token
+    const cookieObj = cookies.split(';').reduce((acc: Record<string, string>, cookie) => {
+      const [key, value] = cookie.trim().split('=')
+      acc[key] = value
+      return acc
+    }, {})
+
+    console.log('Parsed cookies:', cookieObj)
+
+    const userToken = cookieObj.contexto_token
+    if (!userToken) {
+      socket.disconnect()
+      console.error('No authentication token found in cookies')
+      return
+    }
+
+    console.log('Using token from cookie:', userToken)
+
+    // Only validate existing user, never create new ones
+    const user = userManager.getUserByToken(userToken)
+    if (!user) {
+      socket.disconnect()
+      console.error('Invalid or expired authentication token')
+      return
+    }
+
+    // Authentication handler - only validates existing tokens
+    socket.on('auth', () => {
       try {
-        // Try to get token from cookies first, then fallback to data.token
+        // Get token from cookies only
         const cookies = socket.handshake.headers.cookie
-        console.log(cookies)
-        let userToken: string | undefined = data.token
-        
-        if (cookies) {
-          // Parse cookies to find contexto_token
-          const cookieObj = cookies.split(';').reduce((acc: Record<string, string>, cookie) => {
-            const [key, value] = cookie.trim().split('=')
-            acc[key] = value
-            return acc
-          }, {})
-          
-          if (cookieObj.contexto_token) {
-            userToken = cookieObj.contexto_token
-            console.log('Using token from cookie:', userToken)
-          }
-        }
-        
-        let user: User | null = null
+        console.log('Socket auth cookies:', cookies)
 
-        if (userToken) {
-          // Try to get existing user by token
-          user = userManager.getUserByToken(userToken)
-          console.log('Found user by token:', user?.id)
+        if (!cookies) {
+          socket.emit('auth_error', { error: 'No authentication cookies found' })
+          return
         }
 
+        // Parse cookies to find contexto_token
+        const cookieObj = cookies.split(';').reduce((acc: Record<string, string>, cookie) => {
+          const [key, value] = cookie.trim().split('=')
+          acc[key] = value
+          return acc
+        }, {})
+
+        console.log('Parsed cookies:', cookieObj)
+
+        const userToken = cookieObj.contexto_token
+        if (!userToken) {
+          socket.emit('auth_error', { error: 'No authentication token found in cookies' })
+          return
+        }
+
+        console.log('Using token from cookie:', userToken)
+
+        // Only validate existing user, never create new ones
+        const user = userManager.getUserByToken(userToken)
         if (!user) {
-          // Create new user (this will generate a new JWT token internally)
-          user = userManager.createUser()
-          console.log(`New user created:`, user.id)
-          userToken = user.token
+          socket.emit('auth_error', { error: 'Invalid or expired authentication token' })
+          return
         }
+
+        console.log('Found user by token:', user.id)
 
         socketUser = {
-          token: userToken!,
+          token: userToken,
           userId: user.id,
           username: user.username || undefined
         }
 
         socket.emit('auth_success', {
-          token: userToken!,
           user: user.toJSON()
         })
 
-        console.log(`✅ User authenticated: ${user.id}`)
+        console.log(`✅ User authenticated via socket: ${user.id}`)
       } catch (error: any) {
+        console.error('Socket auth error:', error)
         socket.emit('auth_error', { error: error.message })
       }
     })
@@ -312,7 +347,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Handle disconnection
     socket.on('disconnect', () => {
       console.log(`🔌 User disconnected: ${socket.id}`)
-      
+
       if (socketUser && socketUser.currentRoom) {
         // Notify room about player leaving
         socket.to(socketUser.currentRoom).emit('player_left', {
@@ -332,7 +367,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
   setInterval(() => {
     const removedGames = gameManager.cleanupOldGames()
     const removedUsers = userManager.cleanupInactiveUsers()
-    
+
     if (removedGames > 0 || removedUsers > 0) {
       console.log(`🧹 Cleanup: Removed ${removedGames} old games and ${removedUsers} inactive users`)
     }

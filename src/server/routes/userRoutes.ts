@@ -4,6 +4,23 @@ import { UserManager } from '../UserManager'
 export function setupUserRoutes(userManager: UserManager) {
   const router = Router()
 
+  // Initialize or get user - this ensures user exists and cookies are set
+  router.post('/init', async (req: Request, res: Response) => {
+    try {
+      const user = req.user
+      if (!user) {
+        return res.status(500).json({ error: 'Failed to initialize user' })
+      }
+
+      res.json({
+        message: 'User initialized successfully',
+        user: user.toJSON()
+      })
+    } catch (error: any) {
+      res.status(500).json({ error: error.message })
+    }
+  })
+
   // Get current user info
   router.get('/me', async (req: Request, res: Response) => {
     try {

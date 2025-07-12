@@ -6,14 +6,14 @@ export class UserManager {
   private users = new Map<string, User>() // Maps user ID to User
   private usersByUsername = new Map<string, User>()
 
-  createUser(token?: string, username?: string): User {
+  createUser(token?: string, username?: string): { user: User, token: string } {
     // Generate a unique user ID
     const userId = snowflakeGenerator.generate()
     
     // Generate JWT token with user ID
     const jwtToken = token || JWTService.generateToken(userId)
 
-    const user = new User(userId, jwtToken, username)
+    const user = new User(userId, username)
     
     // Store user by ID only
     this.users.set(userId, user)
@@ -22,7 +22,7 @@ export class UserManager {
       this.usersByUsername.set(username, user)
     }
 
-    return user
+    return { user, token: jwtToken }
   }
 
   getUserByToken(token: string): User | null {
@@ -31,6 +31,7 @@ export class UserManager {
     if (!payload) {
       return null
     }
+    console.log(token, payload)
 
     return this.getUserById(payload.userId)
   }
@@ -126,9 +127,7 @@ export class UserManager {
     // Check if token needs refresh
     const newToken = JWTService.refreshTokenIfNeeded(token)
     if (newToken && newToken !== token) {
-      // Update user's token
-      user.token = newToken
-      
+      // Token was refreshed
       return { user, newToken }
     }
 

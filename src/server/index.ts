@@ -66,8 +66,9 @@ app.use((req, res, next) => {
 
 	if (!user) {
 		// Create new user with JWT token
-		user = userManager.createUser()
-		userToken = user.token
+		const result = userManager.createUser()
+		user = result.user
+		userToken = result.token
 
 		// Set cookie with JWT token
 		res.cookie('contexto_token', userToken, {
