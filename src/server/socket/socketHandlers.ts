@@ -1,10 +1,12 @@
 import { Server, Socket } from 'socket.io'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
+import { User } from '../User'
 import snowflakeGenerator from '../../utils/snowflake'
 
 interface SocketUser {
   token: string
+  userId: string
   username?: string
   currentRoom?: string
 }
@@ -20,24 +22,31 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     socket.on('auth', (data: { token?: string }) => {
       try {
         let userToken = data.token
+        let user: User | null = null
 
-        if (!userToken || !userManager.getUserByToken(userToken)) {
-          // Generate new user token
-          userToken = snowflakeGenerator.generate()
-          userManager.createUser(userToken)
+        if (userToken) {
+          // Try to get existing user by token
+          user = userManager.getUserByToken(userToken)
+        }
+
+        if (!user) {
+          // Create new user (this will generate a new JWT token internally)
+          user = userManager.createUser()
+          userToken = user.token
         }
 
         socketUser = {
-          token: userToken,
-          username: userManager.getUserByToken(userToken)?.username || undefined
+          token: userToken!,
+          userId: user.id,
+          username: user.username || undefined
         }
 
         socket.emit('auth_success', {
-          token: userToken,
-          user: userManager.getUserByToken(userToken)?.toJSON()
+          token: userToken!,
+          user: user.toJSON()
         })
 
-        console.log(`✅ User authenticated: ${userToken}`)
+        console.log(`✅ User authenticated: ${user.id}`)
       } catch (error: any) {
         socket.emit('auth_error', { error: error.message })
       }
@@ -74,7 +83,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         socketUser.currentRoom = roomId
 
         // Add user to game
-        gameManager.addUserToGame(socketUser.token, roomId)
+        gameManager.addUserToGame(socketUser.userId, roomId)
 
         // Update user's current room
         const user = userManager.getUserByToken(socketUser.token)
@@ -84,7 +93,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Notify room about new player
         socket.to(roomId).emit('player_joined', {
-          userId: socketUser.token,
+          userId: socketUser.userId,
           username: socketUser.username
         })
 
@@ -94,7 +103,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           finished: game.finished
         })
 
-        console.log(`🏠 User ${socketUser.token} joined room ${roomId}`)
+        console.log(`🏠 User ${socketUser.userId} joined room ${roomId}`)
       } catch (error: any) {
         socket.emit('error', { error: error.message })
       }
@@ -110,7 +119,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         const roomId = socketUser.currentRoom
 
         // Remove user from game
-        gameManager.removeUserFromGame(socketUser.token, roomId)
+        gameManager.removeUserFromGame(socketUser.userId, roomId)
 
         // Update user's current room
         const user = userManager.getUserByToken(socketUser.token)
@@ -123,7 +132,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Notify room about player leaving
         socket.to(roomId).emit('player_left', {
-          userId: socketUser.token,
+          userId: socketUser.userId,
           username: socketUser.username
         })
 
@@ -131,7 +140,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         socket.emit('room_left', { roomId })
 
-        console.log(`🚪 User ${socketUser.token} left room ${roomId}`)
+        console.log(`🚪 User ${socketUser.userId} left room ${roomId}`)
       } catch (error: any) {
         socket.emit('error', { error: error.message })
       }
@@ -164,10 +173,10 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const guess = await game.tryWord(socketUser.token, word.trim().toLowerCase())
+        const guess = await game.tryWord(socketUser.userId, word.trim().toLowerCase())
 
-        // Update user activity
-        userManager.updateUserActivity(socketUser.token)
+        // Update user activity  
+        userManager.updateUserActivity(socketUser.userId)
 
         // Emit guess to the player who made it
         socket.emit('guess_result', {
@@ -178,7 +187,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Emit guess to other players in room (with spoiler for multiplayer games)
         socket.to(roomId).emit('player_guess', {
-          userId: socketUser.token,
+          userId: socketUser.userId,
           username: socketUser.username,
           word: guess.error ? guess.word : `||${guess.word}||`, // Spoiler for valid guesses
           distance: guess.distance,
@@ -198,7 +207,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           // Notify room about game completion
           io.to(roomId).emit('game_finished', {
             winner: {
-              userId: socketUser.token,
+              userId: socketUser.userId,
               username: socketUser.username,
               guessCount: game.guessCount
             },
@@ -206,7 +215,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           })
         }
 
-        console.log(`🎯 User ${socketUser.token} guessed "${word}" in room ${roomId}`)
+        console.log(`🎯 User ${socketUser.userId} guessed "${word}" in room ${roomId}`)
       } catch (error: any) {
         socket.emit('error', { error: error.message })
       }
@@ -229,7 +238,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const closestGuesses = game.getClosestGuesses(socketUser.token, count)
+        const closestGuesses = game.getClosestGuesses(socketUser.userId, count)
 
         socket.emit('closest_guesses', {
           closestGuesses,
@@ -247,7 +256,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       if (socketUser && socketUser.currentRoom) {
         // Notify room about player leaving
         socket.to(socketUser.currentRoom).emit('player_left', {
-          userId: socketUser.token,
+          userId: socketUser.userId,
           username: socketUser.username
         })
       }
