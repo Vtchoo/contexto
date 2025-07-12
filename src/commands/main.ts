@@ -21,7 +21,9 @@ class MainCommand implements ICommand {
                 .setRequired(false)
                 .addChoices(
                     { name: "Cooperativo (padrão)", value: "default" },
-                    { name: "Competitivo", value: "competitive" }
+                    { name: "Competitivo", value: "competitive" },
+                    { name: "Stop", value: "stop" },
+                    { name: "Battle Royale", value: "battle-royale" }
                 )
         )
         .addIntegerOption(option =>
@@ -38,7 +40,7 @@ class MainCommand implements ICommand {
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const word = interaction.options.getString("word")
-        const mode = interaction.options.getString("mode") as 'default' | 'competitive' | null
+        const mode = interaction.options.getString("mode") as 'default' | 'competitive' | 'stop' | 'battle-royale' | null
         const gameId = interaction.options.getInteger("game-id")
         const dateString = interaction.options.getString("date")
 
@@ -72,6 +74,15 @@ class MainCommand implements ICommand {
                 return
             }
             gameIdOrDate = parsedDate
+        }
+
+        // Handle stop and battle-royale modes
+        if (gameType === 'stop' || gameType === 'battle-royale') {
+            await interaction.reply({
+                content: `❌ Para jogar no modo ${gameType === 'stop' ? 'Stop' : 'Battle Royale'}, use primeiro \`/create mode:${gameType}\` para criar uma sala.`,
+                ephemeral: true
+            })
+            return
         }
 
         try {

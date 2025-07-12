@@ -47,6 +47,7 @@ class HelpCommand implements ICommand {
                 {
                     name: "💡 Comandos de Ajuda",
                     value: 
+                        "`/peek` - Vê suas palavras mais próximas sem fazer tentativa\n" +
                         "`/tip` - Recebe uma dica (apenas em jogos cooperativos solo)\n" +
                         "`/giveup` - Desiste e revela a palavra (apenas em jogos cooperativos solo)",
                     inline: false
