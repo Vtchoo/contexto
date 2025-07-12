@@ -1,42 +1,21 @@
 import { AxiosError } from 'axios'
-import GameApi from './gameApi'
-import { getTodaysGameId } from './utils/misc'
-import snowflakeGenerator from '../utils/snowflake'
-import { GameWord, Guess, IGame, PlayerScore } from './interface'
+import { GameWord, Guess, PlayerScore } from './interface'
 import type { ContextoManager } from './ContextoManager'
+import { ContextoBaseGame } from './ContextoBaseGame'
 
-class ContextoStopGame implements IGame {
-
-    private readonly manager: ContextoManager
-    private readonly gameApi: ReturnType<typeof GameApi>
-
-    public readonly id = snowflakeGenerator.generate()
-    gameId: number
-    players: string[] = []
+class ContextoStopGame extends ContextoBaseGame {
     private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
     private winnerInfo: { playerId: string; guessCount: number; completedAt: Date } | null = null
     finished = false
 
-    allowTips = false // No tips in stop mode
-    allowGiveUp = true // Can give up (leaves room)
-
-    started = false // Stop games start unstarted - must be explicitly started
-
     constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        if (typeof gameIdOrDate === 'number') {
-            this.gameId = gameIdOrDate
-        } else if (gameIdOrDate instanceof Date) {
-            // Convert date to game ID
-            const today = new Date()
-            const diffDays = Math.floor((today.getTime() - gameIdOrDate.getTime()) / (1000 * 60 * 60 * 24))
-            this.gameId = getTodaysGameId() - diffDays
-        } else {
-            this.gameId = getTodaysGameId()
-        }
+        super(playerId, manager, gameIdOrDate)
         
-        this.players.push(playerId)
-        this.manager = manager
-        this.gameApi = GameApi('pt-br', this.gameId)
+        // Stop game specific settings
+        this.allowTips = false // No tips in stop mode
+        this.allowGiveUp = true // Can give up (leaves room)
+        this.started = false // Stop games start unstarted - must be explicitly started
+        
         // Initialize empty guess array for the first player
         this.playerGuesses.set(playerId, [])
     }
@@ -46,7 +25,7 @@ class ContextoStopGame implements IGame {
         return !this.started && this.players.length > 0
     }
 
-    // Start the stop game
+    // Start the stop game - override base implementation
     startGame(): void {
         if (this.started) {
             throw new Error("Game has already been started")
@@ -57,26 +36,29 @@ class ContextoStopGame implements IGame {
         this.started = true
     }
 
-    addPlayer(playerId: string) {
-        if (this.players.includes(playerId)) {
-            throw new Error(`Player ${playerId} is already in the game`)
-        }
+    // Override addPlayer to initialize guess array
+    addPlayer(playerId: string): void {
         if (this.finished) {
             throw new Error(`Game has already finished`)
         }
-        this.players.push(playerId)
+        super.addPlayer(playerId)
         // Initialize empty guess array for new player
         this.playerGuesses.set(playerId, [])
     }
 
-    removePlayer(playerId: string) {
-        const index = this.players.indexOf(playerId)
-        if (index === -1) {
-            throw new Error(`Player ${playerId} is not in the game`)
-        }
-        this.players.splice(index, 1)
+    // Override removePlayer to clean up guess data
+    removePlayer(playerId: string): void {
+        super.removePlayer(playerId)
         // Remove player's guesses
         this.playerGuesses.delete(playerId)
+    }
+
+    // Implement abstract method for tip calculation (though tips are disabled)
+    protected getGuessHistoryForTips(playerId: string): Array<[string, number]> {
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses
+            .filter(guess => !guess.error && guess.distance !== undefined)
+            .map(guess => [guess.word, guess.distance!])
     }
 
     addGuess(playerId: string, guess: Guess) {
@@ -98,12 +80,6 @@ class ContextoStopGame implements IGame {
     getExistingGuess(word: string, playerId: string): Guess | undefined {
         const playerGuesses = this.playerGuesses.get(playerId) || []
         return playerGuesses.find(guess => guess.word === word || guess.lemma === word)
-    }
-
-    // Get player's current guess count
-    getGuessCount(playerId: string): number {
-        const playerGuesses = this.playerGuesses.get(playerId) || []
-        return playerGuesses.filter(guess => !guess.error).length
     }
 
     // Legacy getter for compatibility - total guesses across all players
@@ -128,29 +104,13 @@ class ContextoStopGame implements IGame {
             throw new Error(`Player ${playerId} is not in the game`)
         }
 
-        // Check in the cached words first
-        const cachedWord = await this.manager.getCachedWord(this.gameId, word)
-        if (cachedWord) {
-            if (cachedWord.error) {
-                const guess: Guess = {
-                    word,
-                    addedBy: playerId,
-                    error: cachedWord.error
-                }
-                this.addGuess(playerId, guess)
-                return guess
-            }
-
-            const guess: Guess = {
-                word,
-                lemma: cachedWord.lemma,
-                distance: cachedWord.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, guess)
+        // Try to get from cache first
+        const cachedGuess = await this.processWordFromCache(playerId, word)
+        if (cachedGuess) {
+            this.addGuess(playerId, cachedGuess)
             
             // Check if player found the word - END THE GAME!
-            if (cachedWord.distance === 0) {
+            if (!cachedGuess.error && cachedGuess.distance === 0) {
                 const playerGuesses = this.playerGuesses.get(playerId) || []
                 this.winnerInfo = {
                     playerId,
@@ -160,53 +120,25 @@ class ContextoStopGame implements IGame {
                 this.finished = true
             }
             
-            return guess
+            return cachedGuess
         }
 
-        try {
-            const { data } = await this.gameApi.play(word)
-            const guess: Guess = {
-                word,
-                lemma: data.lemma,
-                distance: data.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, guess)
+        // Get from API if not cached
+        const guess = await this.processWordFromAPI(playerId, word)
+        this.addGuess(playerId, guess)
 
-            // Check if player found the word - END THE GAME!
-            if (data.distance === 0) {
-                const playerGuesses = this.playerGuesses.get(playerId) || []
-                this.winnerInfo = {
-                    playerId,
-                    guessCount: playerGuesses.length,
-                    completedAt: new Date()
-                }
-                this.finished = true
+        // Check if player found the word - END THE GAME!
+        if (!guess.error && guess.distance === 0) {
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            this.winnerInfo = {
+                playerId,
+                guessCount: playerGuesses.length,
+                completedAt: new Date()
             }
-            
-            // Cache the word for quick access next time
-            await this.manager.cacheWord(this.gameId, {
-                word: data.word,
-                lemma: data.lemma,
-                distance: data.distance
-            })
-            return guess
-        } catch (error) {
-            if (error instanceof AxiosError) {
-                const { error: message } = error.response?.data ?? {}
-                if (message) {
-                    const guess: Guess = {
-                        word,
-                        addedBy: playerId,
-                        error: message
-                    }
-                    this.addGuess(playerId, guess)
-                    await this.manager.cacheWord(this.gameId, { word, error: message })
-                    return guess
-                }
-            }
-            throw new Error(`Failed to play word "${word}": ${error.message}`)
+            this.finished = true
         }
+        
+        return guess
     }
 
     getClosestGuesses(playerId: string, count?: number): GameWord[] {
@@ -218,32 +150,21 @@ class ContextoStopGame implements IGame {
             .slice(0, count ?? 10) // Limit to the closest guesses
     }
 
-    // Get player's guess count
-    getPlayerGuessCount(playerId: string): number {
-        return this.getGuessCount(playerId)
+    // Get player's guess count - implement base class method
+    getGuessCount(playerId?: string): number {
+        if (playerId) {
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            return playerGuesses.filter(guess => !guess.error).length
+        }
+        // Legacy: total guesses across all players
+        let totalGuesses = 0
+        for (const guesses of this.playerGuesses.values()) {
+            totalGuesses += guesses.filter(guess => !guess.error).length
+        }
+        return totalGuesses
     }
 
-    // Get the number of players in the game
-    getPlayerCount(): number {
-        return this.players.length
-    }
-
-    // Check if a player is the host (first player who created the room)
-    isHost(playerId: string): boolean {
-        return this.players.length > 0 && this.players[0] === playerId
-    }
-
-    // Check if the game allows tips
-    canUseTips(): boolean {
-        return this.allowTips
-    }
-
-    // Check if the game allows giving up
-    canGiveUp(): boolean {
-        return this.allowGiveUp
-    }
-
-    // Tips are disabled in stop mode
+    // Override getTip to disable tips in stop mode
     async getTip(playerId: string): Promise<{ word: string; distance: number; error?: string }> {
         return {
             word: "",
@@ -338,15 +259,22 @@ class ContextoStopGame implements IGame {
     // Get game word (for displaying results after game ends)
     async getGameWord(): Promise<GameWord | null> {
         try {
-            const response = await this.gameApi.giveUp()
+            const word = await this.getAnswerFromAPI()
             return {
-                word: response.data.word,
+                word,
                 distance: 0
             }
         } catch (error) {
             console.error("Error getting game word:", error)
             return null
         }
+    }
+
+    // Additional methods specific to stop game
+
+    // Get player's guess count (compatibility method)
+    getPlayerGuessCount(playerId: string): number {
+        return this.getGuessCount(playerId)
     }
 
     // Check if game has a winner (someone found the answer)

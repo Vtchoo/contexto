@@ -1,9 +1,8 @@
 import { AxiosError } from 'axios'
-import GameApi from './gameApi'
-import { getTodaysGameId, halfTipDistance } from './utils/misc'
-import snowflakeGenerator from '../utils/snowflake'
-import { GameWord, Guess, IGame, PlayerScore } from './interface'
+import { halfTipDistance } from './utils/misc'
+import { GameWord, Guess, PlayerScore } from './interface'
 import type { ContextoManager } from './ContextoManager'
+import { ContextoBaseGame } from './ContextoBaseGame'
 
 interface BattleRoyalePlayerProgress {
     playerId: string
@@ -12,63 +11,40 @@ interface BattleRoyalePlayerProgress {
     guessCount: number
 }
 
-class ContextoBattleRoyaleGame implements IGame {
-
-    private readonly manager: ContextoManager
-    private readonly gameApi: ReturnType<typeof GameApi>
-
-    public readonly id = snowflakeGenerator.generate()
-    gameId: number
-    players: string[] = []
+class ContextoBattleRoyaleGame extends ContextoBaseGame {
     private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
     private usedWords: Set<string> = new Set() // Global set of words used by any player
     private usedLemmas: Set<string> = new Set() // Global set of lemmas used by any player
     finished = false
     private winner: PlayerScore | null = null
 
-    allowTips = true
-    allowGiveUp = true
-
-    started = false
-
     constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        if (typeof gameIdOrDate === 'number') {
-            this.gameId = gameIdOrDate
-        } else if (gameIdOrDate instanceof Date) {
-            // Convert date to game ID
-            const today = new Date()
-            const diffDays = Math.floor((today.getTime() - gameIdOrDate.getTime()) / (1000 * 60 * 60 * 24))
-            this.gameId = getTodaysGameId() - diffDays
-        } else {
-            this.gameId = getTodaysGameId()
-        }
+        super(playerId, manager, gameIdOrDate)
         
-        this.players.push(playerId)
-        this.manager = manager
-        this.gameApi = GameApi('pt-br', this.gameId)
+        // Battle Royale specific settings
+        this.allowTips = true
+        this.allowGiveUp = true
+        this.started = false
+        
         // Initialize empty guess array for the first player
         this.playerGuesses.set(playerId, [])
     }
 
-    startGame() {
-        this.started = true
+    // Override startGame from base class
+    startGame(): void {
+        super.startGame()
     }
 
-    addPlayer(playerId: string) {
-        if (this.players.includes(playerId)) {
-            throw new Error(`Player ${playerId} is already in the game`)
-        }
-        this.players.push(playerId)
+    // Override addPlayer to initialize guess array
+    addPlayer(playerId: string): void {
+        super.addPlayer(playerId)
         // Initialize empty guess array for new player
         this.playerGuesses.set(playerId, [])
     }
 
-    removePlayer(playerId: string) {
-        const index = this.players.indexOf(playerId)
-        if (index === -1) {
-            throw new Error(`Player ${playerId} is not in the game`)
-        }
-        this.players.splice(index, 1)
+    // Override removePlayer with battle royale specific logic
+    removePlayer(playerId: string): void {
+        super.removePlayer(playerId)
         // Remove player's guesses but keep used words in the global set
         this.playerGuesses.delete(playerId)
         
@@ -82,6 +58,14 @@ class ContextoBattleRoyaleGame implements IGame {
         if (this.players.length === 0) {
             this.finished = true
         }
+    }
+
+    // Implement abstract method for tip calculation
+    protected getGuessHistoryForTips(playerId: string): Array<[string, number]> {
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses
+            .filter(guess => !guess.error && guess.distance !== undefined)
+            .map(guess => [guess.word, guess.distance!])
     }
 
     addGuess(playerId: string, guess: Guess) {
@@ -122,10 +106,18 @@ class ContextoBattleRoyaleGame implements IGame {
         return playerGuesses.find(guess => guess.word === word || guess.lemma === word)
     }
 
-    // Get player's current guess count
-    getGuessCount(playerId: string): number {
-        const playerGuesses = this.playerGuesses.get(playerId) || []
-        return playerGuesses.filter(guess => !guess.error).length
+    // Get player's current guess count - implement base class method
+    getGuessCount(playerId?: string): number {
+        if (playerId) {
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            return playerGuesses.filter(guess => !guess.error).length
+        }
+        // Legacy: total guesses across all players
+        let totalGuesses = 0
+        for (const guesses of this.playerGuesses.values()) {
+            totalGuesses += guesses.filter(guess => !guess.error).length
+        }
+        return totalGuesses
     }
 
     // Get player's current guess count (alias for compatibility)
@@ -155,7 +147,7 @@ class ContextoBattleRoyaleGame implements IGame {
             throw new Error(`Player ${playerId} is not in the game`)
         }
 
-        // Check in the cached words first to get lemma
+        // Check in the cached words first to get lemma for word usage check
         const cachedWord = await this.manager.getCachedWord(this.gameId, word)
         let wordLemma = cachedWord?.lemma
 
@@ -180,28 +172,13 @@ class ContextoBattleRoyaleGame implements IGame {
             return guess
         }
 
-        // Check in the cached words for actual game logic
-        if (cachedWord) {
-            if (cachedWord.error) {
-                const guess: Guess = {
-                    word,
-                    addedBy: playerId,
-                    error: cachedWord.error
-                }
-                this.addGuess(playerId, guess)
-                return guess
-            }
-
-            const guess: Guess = {
-                word,
-                lemma: cachedWord.lemma,
-                distance: cachedWord.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, guess)
+        // Try to get from cache first using base class helper
+        const cachedGuess = await this.processWordFromCache(playerId, word)
+        if (cachedGuess) {
+            this.addGuess(playerId, cachedGuess)
             
             // Check if player found the word and end the game
-            if (cachedWord.distance === 0) {
+            if (!cachedGuess.error && cachedGuess.distance === 0) {
                 this.finished = true
                 this.winner = {
                     playerId,
@@ -210,52 +187,24 @@ class ContextoBattleRoyaleGame implements IGame {
                 }
             }
             
-            return guess
+            return cachedGuess
         }
 
-        try {
-            const { data } = await this.gameApi.play(word)
-            const guess: Guess = {
-                word,
-                lemma: data.lemma,
-                distance: data.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, guess)
+        // Get from API using base class helper
+        const guess = await this.processWordFromAPI(playerId, word)
+        this.addGuess(playerId, guess)
 
-            // Check if player found the word and end the game
-            if (data.distance === 0) {
-                this.finished = true
-                this.winner = {
-                    playerId,
-                    guessCount: this.getGuessCount(playerId),
-                    completedAt: new Date()
-                }
+        // Check if player found the word and end the game
+        if (!guess.error && guess.distance === 0) {
+            this.finished = true
+            this.winner = {
+                playerId,
+                guessCount: this.getGuessCount(playerId),
+                completedAt: new Date()
             }
-            
-            // Cache the word for quick access next time
-            await this.manager.cacheWord(this.gameId, {
-                word: data.word,
-                lemma: data.lemma,
-                distance: data.distance
-            })
-            return guess
-        } catch (error) {
-            if (error instanceof AxiosError) {
-                const { error: message } = error.response?.data ?? {}
-                if (message) {
-                    const guess: Guess = {
-                        word,
-                        addedBy: playerId,
-                        error: message
-                    }
-                    this.addGuess(playerId, guess)
-                    await this.manager.cacheWord(this.gameId, { word, error: message })
-                    return guess
-                }
-            }
-            throw new Error(`Failed to play word "${word}": ${error.message}`)
         }
+        
+        return guess
     }
 
     getClosestGuesses(playerId: string, count?: number): GameWord[] {
@@ -303,33 +252,12 @@ class ContextoBattleRoyaleGame implements IGame {
         return this.winner
     }
 
-    // Get the number of players in the game
-    getPlayerCount(): number {
-        return this.players.length
-    }
-
-    // Check if a player is the host (first player who created the room)
-    isHost(playerId: string): boolean {
-        console.log('Checking if player is host:', playerId, 'Current players:', this.players) // Debug log
-        return this.players.length > 0 && this.players[0] === playerId
-    }
-
-    // Check if the game allows tips
-    canUseTips(): boolean {
-        return this.allowTips
-    }
-
-    // Check if the game allows giving up
-    canGiveUp(): boolean {
-        return this.allowGiveUp
-    }
-
     // Check if the game can be started
     canStart(): boolean {
         return this.players.length > 0 && !this.started && !this.finished
     }
 
-    // Get a tip for a specific player
+    // Override getTip for Battle Royale specific logic (avoiding used words)
     async getTip(playerId: string): Promise<{ word: string; distance: number; error?: string }> {
         if (!this.canUseTips()) {
             throw new Error("Tips are not allowed in this game")
@@ -344,12 +272,9 @@ class ContextoBattleRoyaleGame implements IGame {
         }
 
         try {
-            // Convert player's guesses to the format expected by tip functions
-            const playerGuesses = this.playerGuesses.get(playerId) || []
-            const guessHistory = playerGuesses
-                .filter(guess => !guess.error && guess.distance !== undefined)
-                .map(guess => [guess.word, guess.distance])
-
+            // Get guess history for tip calculation using base class helper
+            const guessHistory = this.getGuessHistoryForTips(playerId)
+            
             // Calculate tip distance using the game's easy difficulty rule (default)
             const tipDist = halfTipDistance(guessHistory)
             
@@ -443,7 +368,7 @@ class ContextoBattleRoyaleGame implements IGame {
         }
     }
 
-    // Get the answer and end the game
+    // Override giveUpAndGetAnswer for Battle Royale (using base class helper)
     async giveUpAndGetAnswer(): Promise<{ word: string; error?: string }> {
         if (!this.canGiveUp()) {
             throw new Error("Give up is not allowed in this game")

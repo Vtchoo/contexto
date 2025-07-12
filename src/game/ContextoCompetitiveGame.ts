@@ -4,69 +4,36 @@ import { getTodaysGameId, halfTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
 import { GameWord, Guess, IGame, PlayerScore } from './interface'
 import type { ContextoManager } from './ContextoManager'
+import { ContextoBaseGame } from './ContextoBaseGame'
 
-class ContextoCompetitiveGame implements IGame {
-
-    private readonly manager: ContextoManager
-    private readonly gameApi: ReturnType<typeof GameApi>
-
-    public readonly id = snowflakeGenerator.generate()
-    gameId: number
-    players: string[] = []
+class ContextoCompetitiveGame extends ContextoBaseGame {
     private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
     private playerCompletions: PlayerScore[] = [] // Track when players complete the word
+    
     finished = false // Always false in competitive mode
 
-    allowTips = true
-    allowGiveUp = true
-
-    started = false
-
     constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        if (typeof gameIdOrDate === 'number') {
-            this.gameId = gameIdOrDate
-        } else if (gameIdOrDate instanceof Date) {
-            // Convert date to game ID
-            const today = new Date()
-            const diffDays = Math.floor((today.getTime() - gameIdOrDate.getTime()) / (1000 * 60 * 60 * 24))
-            this.gameId = getTodaysGameId() - diffDays
-        } else {
-            this.gameId = getTodaysGameId()
-        }
-        
-        this.players.push(playerId)
-        this.manager = manager
-        this.gameApi = GameApi('pt-br', this.gameId)
+        super(playerId, manager, gameIdOrDate)
+        this.started = false // Competitive games start unstarted
         // Initialize empty guess array for the first player
         this.playerGuesses.set(playerId, [])
     }
 
-    startGame() {
-        this.started = true
-    }
-
-    addPlayer(playerId: string) {
-        if (this.players.includes(playerId)) {
-            throw new Error(`Player ${playerId} is already in the game`)
-        }
-        this.players.push(playerId)
+    addPlayer(playerId: string): void {
+        super.addPlayer(playerId)
         // Initialize empty guess array for new player
         this.playerGuesses.set(playerId, [])
     }
 
-    removePlayer(playerId: string) {
-        const index = this.players.indexOf(playerId)
-        if (index === -1) {
-            throw new Error(`Player ${playerId} is not in the game`)
-        }
-        this.players.splice(index, 1)
+    removePlayer(playerId: string): void {
+        super.removePlayer(playerId)
         // Remove player's guesses and completions
         this.playerGuesses.delete(playerId)
         this.playerCompletions = this.playerCompletions.filter(score => score.playerId !== playerId)
         // Note: Don't finish the game when players leave in competitive mode
     }
 
-    addGuess(playerId: string, guess: Guess) {
+    addGuess(playerId: string, guess: Guess): void {
         if (!this.players.includes(playerId)) {
             throw new Error(`Player ${playerId} is not in the game`)
         }
@@ -116,29 +83,13 @@ class ContextoCompetitiveGame implements IGame {
             throw new Error(`Player ${playerId} has already found the word`)
         }
 
-        // Check in the cached words first
-        const cachedWord = await this.manager.getCachedWord(this.gameId, word)
-        if (cachedWord) {
-            if (cachedWord.error) {
-                const guess: Guess = {
-                    word,
-                    addedBy: playerId,
-                    error: cachedWord.error
-                }
-                this.addGuess(playerId, guess)
-                return guess
-            }
-
-            const guess: Guess = {
-                word,
-                lemma: cachedWord.lemma,
-                distance: cachedWord.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, guess)
+        // Try to get word from cache first
+        const cachedGuess = await this.processWordFromCache(playerId, word)
+        if (cachedGuess) {
+            this.addGuess(playerId, cachedGuess)
             
             // Check if player found the word
-            if (cachedWord.distance === 0) {
+            if (!cachedGuess.error && cachedGuess.distance === 0) {
                 const playerGuesses = this.playerGuesses.get(playerId) || []
                 this.playerCompletions.push({
                     playerId,
@@ -147,52 +98,24 @@ class ContextoCompetitiveGame implements IGame {
                 })
             }
             
-            return guess
+            return cachedGuess
         }
 
-        try {
-            const { data } = await this.gameApi.play(word)
-            const guess: Guess = {
-                word,
-                lemma: data.lemma,
-                distance: data.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, guess)
+        // Process word from API
+        const guess = await this.processWordFromAPI(playerId, word)
+        this.addGuess(playerId, guess)
 
-            // Check if player found the word - don't end game, just record completion
-            if (data.distance === 0) {
-                const playerGuesses = this.playerGuesses.get(playerId) || []
-                this.playerCompletions.push({
-                    playerId,
-                    guessCount: playerGuesses.length,
-                    completedAt: new Date()
-                })
-            }
-            
-            // Cache the word for quick access next time
-            await this.manager.cacheWord(this.gameId, {
-                word: data.word,
-                lemma: data.lemma,
-                distance: data.distance
+        // Check if player found the word - don't end game, just record completion
+        if (guess.distance === 0) {
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            this.playerCompletions.push({
+                playerId,
+                guessCount: playerGuesses.length,
+                completedAt: new Date()
             })
-            return guess
-        } catch (error) {
-            if (error instanceof AxiosError) {
-                const { error: message } = error.response?.data ?? {}
-                if (message) {
-                    const guess: Guess = {
-                        word,
-                        addedBy: playerId,
-                        error: message
-                    }
-                    this.addGuess(playerId, guess)
-                    await this.manager.cacheWord(this.gameId, { word, error: message })
-                    return guess
-                }
-            }
-            throw new Error(`Failed to play word "${word}": ${error.message}`)
         }
+
+        return guess
     }
 
     getClosestGuesses(playerId: string, count?: number): GameWord[] {
@@ -202,6 +125,14 @@ class ContextoCompetitiveGame implements IGame {
             .filter(guess => !guess.error) // Filter out invalid guesses
             .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0)) // Sort by distance
             .slice(0, count ?? 10) // Limit to the closest guesses
+    }
+
+    protected getGuessHistoryForTips(playerId: string): Array<[string, number]> {
+        // Convert player's guesses to the format expected by tip functions
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses
+            .filter(guess => !guess.error && guess.distance !== undefined)
+            .map(guess => [guess.word, guess.distance!])
     }
 
     // Get player's guess count
@@ -241,27 +172,7 @@ class ContextoCompetitiveGame implements IGame {
             }))
     }
 
-    // Get the number of players in the game
-    getPlayerCount(): number {
-        return this.players.length
-    }
-
-    // Check if a player is the host (first player who created the room)
-    isHost(playerId: string): boolean {
-        return this.players.length > 0 && this.players[0] === playerId
-    }
-
-    // Check if the game allows tips
-    canUseTips(): boolean {
-        return this.allowTips
-    }
-
-    // Check if the game allows giving up
-    canGiveUp(): boolean {
-        return this.allowGiveUp
-    }
-
-    // Get a tip for a specific player in competitive mode
+    // Override getTip to check for player completion
     async getTip(playerId: string): Promise<{ word: string; distance: number; error?: string }> {
         if (!this.canUseTips()) {
             throw new Error("Tips are not allowed in this game")
@@ -275,65 +186,11 @@ class ContextoCompetitiveGame implements IGame {
             throw new Error(`Player ${playerId} has already found the word`)
         }
 
-        try {
-            // Convert player's guesses to the format expected by tip functions
-            const playerGuesses = this.playerGuesses.get(playerId) || []
-            const guessHistory = playerGuesses
-                .filter(guess => !guess.error && guess.distance !== undefined)
-                .map(guess => [guess.word, guess.distance])
-
-            // Calculate tip distance using the game's easy difficulty rule (default)
-            const tipDist = halfTipDistance(guessHistory)
-            
-            // First, check if we already have a word at this exact distance in cache
-            const cachedWordAtDistance = await this.manager.getCachedWordByDistance(this.gameId, tipDist)
-            
-            if (cachedWordAtDistance) {
-                // Use the existing cached word at this distance as the tip
-                const tipGuess: Guess = {
-                    word: cachedWordAtDistance.word,
-                    lemma: cachedWordAtDistance.lemma || cachedWordAtDistance.word,
-                    distance: cachedWordAtDistance.distance!,
-                    addedBy: playerId
-                }
-                this.addGuess(playerId, tipGuess)
-                
-                return {
-                    word: cachedWordAtDistance.word,
-                    distance: cachedWordAtDistance.distance!
-                }
-            }
-            
-            // If no cached word at this distance, fetch from API
-            const { data } = await this.gameApi.tip(tipDist)
-            
-            // Add the tip word as a guess to the player's personal list
-            const tipGuess: Guess = {
-                word: data.word,
-                lemma: data.lemma || data.word, // Use lemma from API or fallback to word
-                distance: data.distance,
-                addedBy: playerId
-            }
-            this.addGuess(playerId, tipGuess)
-            
-            // Cache the new tip word normally (it will be stored with its actual word as key)
-            await this.manager.cacheWord(this.gameId, {
-                word: data.word,
-                lemma: data.lemma,
-                distance: data.distance
-            })
-            
-            return {
-                word: data.word,
-                distance: data.distance
-            }
-        } catch (error) {
-            return {
-                word: "",
-                distance: -1,
-                error: "Não foi possível obter uma dica no momento"
-            }
-        }
+        // Use the base class implementation with competitive-specific guess history
+        const guessHistory = this.getGuessHistoryForTips(playerId)
+        const tipDistance = halfTipDistance(guessHistory)
+        
+        return this.processTipRequest(playerId, tipDistance)
     }
 
     // Give up is not really applicable in competitive mode, but we can remove the player
@@ -353,38 +210,16 @@ class ContextoCompetitiveGame implements IGame {
         }
     }
 
-    // Get the answer without ending the game (for competitive mode)
+    // Override give up to not end the game (competitive mode)
     async giveUpAndGetAnswer(): Promise<{ word: string; error?: string }> {
         if (!this.canGiveUp()) {
             throw new Error("Give up is not allowed in this game")
         }
 
         try {
-            // Check if we already have the answer (word with distance 0) in cache
-            const cachedAnswer = await this.manager.getCachedWordByDistance(this.gameId, 0)
-            
-            let answerWord: string
-            
-            if (cachedAnswer) {
-                // Use cached answer
-                answerWord = cachedAnswer.word
-            } else {
-                // Fetch from API and cache normally
-                const { data } = await this.gameApi.giveUp()
-                answerWord = data.word
-                
-                // Cache the answer normally (it will be stored with its actual word as key and distance 0)
-                await this.manager.cacheWord(this.gameId, {
-                    word: data.word,
-                    lemma: data.lemma,
-                    distance: 0
-                })
-            }
-            
+            const answerWord = await this.getAnswerFromAPI()
             // In competitive mode, don't end the game, just return the answer
-            return {
-                word: answerWord
-            }
+            return { word: answerWord }
         } catch (error) {
             return {
                 word: "",
