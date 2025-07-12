@@ -27,7 +27,32 @@ function GameInterface({
   loading 
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
+  const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleRoomIdClick = async () => {
+    if (!roomId) return
+    
+    try {
+      const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`
+      await navigator.clipboard.writeText(url)
+      
+      setShowCopiedFeedback(true)
+      setTimeout(() => setShowCopiedFeedback(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy URL:', error)
+      // Fallback for browsers that don't support clipboard API
+      const textArea = document.createElement('textarea')
+      textArea.value = `${window.location.origin}${window.location.pathname}?room=${roomId}`
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      
+      setShowCopiedFeedback(true)
+      setTimeout(() => setShowCopiedFeedback(false), 2000)
+    }
+  }
 
   // Sort guesses by distance (closest first)
   const sortedGuesses = [...guesses]
@@ -136,7 +161,38 @@ function GameInterface({
           {roomId && (
             <>
               <span className="label">SALA:</span>{' '}
-              <span style={{ fontWeight: 'bold', fontSize: '1.1em', color: '#28a745' }}>{roomId}</span>
+              <span 
+                onClick={handleRoomIdClick}
+                style={{ 
+                  fontWeight: 'bold', 
+                  fontSize: '1.1em', 
+                  color: '#28a745',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textDecorationStyle: 'dashed',
+                  position: 'relative'
+                }}
+                title="Clique para copiar o link da sala"
+              >
+                {roomId}
+                {showCopiedFeedback && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-25px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#28a745',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    whiteSpace: 'nowrap',
+                    zIndex: 1000
+                  }}>
+                    Link copiado!
+                  </span>
+                )}
+              </span>
               &nbsp;&nbsp;&nbsp;
             </>
           )}

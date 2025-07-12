@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
 import { useGame } from '../contexts/GameContext'
@@ -198,7 +199,27 @@ function HomePage() {
   const [showDemo, setShowDemo] = useState(false)
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
   const { createGame, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId } = useGame()
+
+  // Handle URL room parameter
+  useEffect(() => {
+    const roomParam = searchParams.get('room')
+    if (roomParam && isConnected && !currentRoom && !showDemo) {
+      // Auto-join room from URL parameter
+      joinRoom(roomParam.toUpperCase())
+        .then(() => {
+          setShowDemo(true)
+          // Remove the room parameter from URL after joining
+          const newParams = new URLSearchParams(searchParams)
+          newParams.delete('room')
+          setSearchParams(newParams)
+        })
+        .catch((error) => {
+          console.error('Failed to join room from URL:', error)
+        })
+    }
+  }, [searchParams, isConnected, currentRoom, showDemo, joinRoom, setSearchParams])
 
   const handleQuickPlay = async (e: React.FormEvent) => {
     e.preventDefault()
