@@ -202,11 +202,11 @@ function useGameHook() {
       console.log('Creating game with initial state:', initialGame) // Debug log
       setCurrentGame(initialGame)
 
-      // // Join the room via socket to ensure the socket connection knows about it
-      // if (socket && isConnected) {
-      //   console.log('Joining room via socket:', response.roomId) // Debug log
-      //   socket.emit('join_room', { roomId: response.roomId })
-      // }
+      // Join the room via socket to ensure the socket connection knows about it
+      if (socket && isConnected) {
+        console.log('Joining room via socket:', response.roomId) // Debug log
+        socket.emit('join_room', { roomId: response.roomId })
+      }
 
       return response.roomId.toString()
     } catch (err) {
