@@ -3,6 +3,7 @@ import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
 import { User } from '../User'
 import snowflakeGenerator from '../../utils/snowflake'
+import JWTService from '../../utils/jwt'
 
 interface SocketUser {
   token: string
@@ -46,9 +47,16 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     console.log('Using token from cookie:', userToken)
 
     // Only validate existing user, never create new ones
-    const user = userManager.getUserByToken(userToken)
+    const payload = JWTService.verifyToken(userToken)
+    if (!payload) {
+      console.error('Invalid JWT token')
+      socket.disconnect()
+      return
+    }
+
+    const user = userManager.getUserById(payload.userId)
     if (!user) {
-      console.error('Invalid or expired authentication token')
+      console.error('User not found for token')
       socket.disconnect()
       return
     }
@@ -85,9 +93,11 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         // Leave current room if any
-        const user = userManager.getUserByToken(socketUser.token)
-        if (user && user.currentRoom) {
-          socket.leave(user.currentRoom)
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (currentRoom) {
+          socket.leave(currentRoom)
         }
 
         // Join new room
@@ -98,7 +108,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Update user's current room
         if (user) {
-          user.joinRoom(roomId)
+          userManager.joinUserToRoom(user.id, roomId)
         }
 
         // Notify room about new player
@@ -128,18 +138,20 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const user = userManager.getUserByToken(socketUser.token)
-        if (!user || !user.currentRoom) {
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
           return
         }
 
-        const roomId = user.currentRoom
+        const roomId = currentRoom
 
         // Remove user from game
         gameManager.removeUserFromGame(socketUser.userId, roomId)
 
         // Update user's current room
-        user.leaveRoom()
+        userManager.removeUserFromRoom(user.id)
 
         // Leave socket room
         socket.leave(roomId)
@@ -166,16 +178,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const user = userManager.getUserByToken(socketUser.token)
-        if (!user || !user.currentRoom) {
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
           return
         }
 
-        console.log(`🔍 User ${socketUser.userId} making guess in room ${user.currentRoom}:`, data.word)
+        console.log(`🔍 User ${socketUser.userId} making guess in room ${currentRoom}:`, data.word)
 
         const { word } = data
-        const roomId = user.currentRoom
+        const roomId = currentRoom
 
         if (!word || typeof word !== 'string') {
           socket.emit('error', { error: 'Word is required' })
@@ -217,7 +231,8 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // If game finished, update user stats
         if (game.finished && guess.distance === 0) {
-          const user = userManager.getUserByToken(socketUser.token)
+          const payload = JWTService.verifyToken(socketUser.token)
+          const user = payload ? userManager.getUserById(payload.userId) : null
           if (user) {
             user.incrementGamesPlayed()
             user.incrementGamesWon()
@@ -249,13 +264,15 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const user = userManager.getUserByToken(socketUser.token)
-        if (!user || !user.currentRoom) {
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
           return
         }
 
-        const roomId = user.currentRoom
+        const roomId = currentRoom
         const game = gameManager.getGame(roomId)
         if (!game) {
           socket.emit('error', { error: 'Game not found' })
@@ -293,14 +310,16 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const user = userManager.getUserByToken(socketUser.token)
-        if (!user || !user.currentRoom) {
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
           return
         }
 
         const { count = 10 } = data
-        const roomId = user.currentRoom
+        const roomId = currentRoom
 
         const game = gameManager.getGame(roomId)
         if (!game) {
@@ -324,16 +343,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       console.log(`🔌 User disconnected: ${socket.id}`)
 
       if (socketUser) {
-        const user = userManager.getUserByToken(socketUser.token)
-        if (user && user.currentRoom) {
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (user && currentRoom) {
           // Notify room about player leaving
-          socket.to(user.currentRoom).emit('player_left', {
+          socket.to(currentRoom).emit('player_left', {
             userId: socketUser.userId,
             username: socketUser.username
           })
 
           // Remove user from game
-          gameManager.removeUserFromGame(socketUser.userId, user.currentRoom)
+          gameManager.removeUserFromGame(socketUser.userId, currentRoom)
         }
       }
     })

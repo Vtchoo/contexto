@@ -38,7 +38,7 @@ app.use(cookieParser())
 
 // Initialize managers
 const gameManager = new GameManager()
-const userManager = new UserManager()
+const userManager = new UserManager(gameManager)
 
 // JWT Token middleware - authenticate users with JWT tokens
 app.use((req, res, next) => {

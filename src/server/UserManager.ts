@@ -1,10 +1,16 @@
 import { User } from './User'
 import snowflakeGenerator from '../utils/snowflake'
 import JWTService from '../utils/jwt'
+import { GameManager } from './GameManager'
 
 export class UserManager {
   private users = new Map<string, User>() // Maps user ID to User
   private usersByUsername = new Map<string, User>()
+  private gameManager: GameManager
+
+  constructor(gameManager: GameManager) {
+    this.gameManager = gameManager
+  }
 
   createUser(token?: string, username?: string): { user: User, token: string } {
     // Generate a unique user ID
@@ -25,19 +31,33 @@ export class UserManager {
     return { user, token: jwtToken }
   }
 
-  getUserByToken(token: string): User | null {
-    // Parse token to get user ID
+  // Helper method to get user by JWT token
+  private getUserIdFromToken(token: string): string | null {
     const payload = JWTService.verifyToken(token)
-    if (!payload) {
-      return null
-    }
-    console.log(token, payload)
-
-    return this.getUserById(payload.userId)
+    return payload ? payload.userId : null
   }
 
   getUserById(userId: string): User | null {
     return this.users.get(userId) || null
+  }
+
+  // Room management methods
+  joinUserToRoom(userId: string, roomId: string): void {
+    this.gameManager.addUserToGame(userId, roomId)
+  }
+
+  removeUserFromRoom(userId: string): void {
+    // Get current room first
+    const currentRoom = this.getUserCurrentRoom(userId)
+    if (currentRoom) {
+      this.gameManager.removeUserFromGame(userId, currentRoom)
+    }
+  }
+
+  getUserCurrentRoom(userId: string): string | null {
+    // Get the user's games and return the first one (users should only be in one room at a time)
+    const games = this.gameManager.getUserGames(userId)
+    return games.length > 0 ? games[0].id : null
   }
 
   getUserByUsername(username: string): User | null {
@@ -45,10 +65,13 @@ export class UserManager {
   }
 
   setUsername(tokenOrId: string, username: string): boolean {
-    // Try to get user by ID first, then by token
+    // Try to get user by ID first, then by parsing token
     let user = this.getUserById(tokenOrId)
     if (!user) {
-      user = this.getUserByToken(tokenOrId)
+      const userId = this.getUserIdFromToken(tokenOrId)
+      if (userId) {
+        user = this.getUserById(userId)
+      }
     }
     
     if (!user) return false
@@ -83,10 +106,13 @@ export class UserManager {
   }
 
   updateUserActivity(tokenOrId: string): void {
-    // Try to get user by ID first, then by token
+    // Try to get user by ID first, then by parsing token
     let user = this.getUserById(tokenOrId)
     if (!user) {
-      user = this.getUserByToken(tokenOrId)
+      const userId = this.getUserIdFromToken(tokenOrId)
+      if (userId) {
+        user = this.getUserById(userId)
+      }
     }
     
     if (user) {
@@ -104,6 +130,8 @@ export class UserManager {
         if (user.username) {
           this.usersByUsername.delete(user.username)
         }
+        // Clean up room mapping by removing user from all games
+        this.removeUserFromRoom(userId)
         this.users.delete(userId)
         removedCount++
       }

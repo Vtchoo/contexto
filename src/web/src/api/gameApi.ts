@@ -19,7 +19,6 @@ export interface User {
   gamesWon: number
   winRate: number
   averageGuesses: number
-  currentRoom?: string
   isActive: boolean
 }
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { UserManager } from '../UserManager'
+import JWTService from '../../utils/jwt'
 
 export function setupUserRoutes(userManager: UserManager) {
   const router = Router()
@@ -58,7 +59,8 @@ export function setupUserRoutes(userManager: UserManager) {
         return res.status(400).json({ error: 'Username is already taken' })
       }
 
-      const user = userManager.getUserByToken(token)
+      const payload = JWTService.verifyToken(token)
+      const user = payload ? userManager.getUserById(payload.userId) : null
       res.json({
         message: 'Username set successfully',
         user: user!.toJSON()
@@ -81,7 +83,8 @@ export function setupUserRoutes(userManager: UserManager) {
         userManager.setUsername(token, fallbackUsername)
       }
 
-      const user = userManager.getUserByToken(token)
+      const payload = JWTService.verifyToken(token)
+      const user = payload ? userManager.getUserById(payload.userId) : null
       res.json({
         message: 'Anonymous username generated successfully',
         user: user!.toJSON()

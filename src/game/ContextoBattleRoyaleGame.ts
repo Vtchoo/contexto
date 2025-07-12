@@ -310,6 +310,7 @@ class ContextoBattleRoyaleGame implements IGame {
 
     // Check if a player is the host (first player who created the room)
     isHost(playerId: string): boolean {
+        console.log('Checking if player is host:', playerId, 'Current players:', this.players) // Debug log
         return this.players.length > 0 && this.players[0] === playerId
     }
 

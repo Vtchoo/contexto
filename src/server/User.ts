@@ -5,7 +5,6 @@ export class User {
   public gamesPlayed: number
   public gamesWon: number
   public averageGuesses: number
-  public currentRoom: string | null
 
   constructor(id: string, username?: string) {
     this.id = id
@@ -14,7 +13,6 @@ export class User {
     this.gamesPlayed = 0
     this.gamesWon = 0
     this.averageGuesses = 0
-    this.currentRoom = null
   }
 
   setUsername(username: string): void {
@@ -30,16 +28,6 @@ export class User {
     // Consider user active if accessed in last 24 hours
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000)
     return this.lastActivity > oneDayAgo
-  }
-
-  joinRoom(roomId: string): void {
-    this.currentRoom = roomId
-    this.updateActivity()
-  }
-
-  leaveRoom(): void {
-    this.currentRoom = null
-    this.updateActivity()
   }
 
   incrementGamesPlayed(): void {
@@ -74,7 +62,6 @@ export class User {
       gamesWon: this.gamesWon,
       winRate: this.getWinRate(),
       averageGuesses: Math.round(this.averageGuesses * 100) / 100,
-      currentRoom: this.currentRoom,
       isActive: this.isActive(),
       lastActivity: this.lastActivity
     }
@@ -88,7 +75,6 @@ export class User {
       gamesWon: this.gamesWon,
       winRate: this.getWinRate(),
       averageGuesses: Math.round(this.averageGuesses * 100) / 100,
-      currentRoom: this.currentRoom,
       isActive: this.isActive()
     }
   }

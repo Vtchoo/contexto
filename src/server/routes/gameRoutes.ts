@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
 import snowflakeGenerator from '../../utils/snowflake'
+import JWTService from '../../utils/jwt'
 
 // Extend Express Request interface
 declare global {
@@ -35,7 +36,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const game = gameManager.getGame(roomId)
 
       // Update user's current room
-      user.joinRoom(roomId)
+      userManager.joinUserToRoom(user.id, roomId)
 
       res.json({
         roomId,
@@ -70,9 +71,10 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       gameManager.addUserToGame(token, roomId)
 
       // Update user's current room
-      const user = userManager.getUserByToken(token)
+      const payload = JWTService.verifyToken(token)
+      const user = payload ? userManager.getUserById(payload.userId) : null
       if (user) {
-        user.joinRoom(roomId)
+        userManager.joinUserToRoom(user.id, roomId)
       }
 
       res.json({
@@ -116,7 +118,8 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
 
       // If game finished, update user stats
       if (game.finished && guess.distance === 0) {
-        const user = userManager.getUserByToken(token)
+        const payload = JWTService.verifyToken(token)
+        const user = payload ? userManager.getUserById(payload.userId) : null
         if (user) {
           user.incrementGamesPlayed()
           user.incrementGamesWon()
@@ -174,9 +177,10 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       gameManager.removeUserFromGame(token, roomId)
 
       // Update user's current room
-      const user = userManager.getUserByToken(token)
+      const payload = JWTService.verifyToken(token)
+      const user = payload ? userManager.getUserById(payload.userId) : null
       if (user) {
-        user.leaveRoom()
+        userManager.removeUserFromRoom(user.id)
       }
 
       res.json({ message: 'Left game successfully' })
