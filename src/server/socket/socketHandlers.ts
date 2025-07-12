@@ -20,7 +20,6 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
     // Authenticate automatically on connection using cookies
     const cookies = socket.handshake.headers.cookie
-    console.log('Socket auth cookies:', cookies)
 
     if (!cookies) {
       console.error('No authentication cookies found')
@@ -35,16 +34,12 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       return acc
     }, {})
 
-    console.log('Parsed cookies:', cookieObj)
-
     const userToken = cookieObj.contexto_token
     if (!userToken) {
       console.error('No authentication token found in cookies')
       socket.disconnect()
       return
     }
-
-    console.log('Using token from cookie:', userToken)
 
     // Only validate existing user, never create new ones
     const payload = JWTService.verifyToken(userToken)
@@ -60,8 +55,6 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       socket.disconnect()
       return
     }
-
-    console.log('Found user by token:', user.id)
 
     socketUser = {
       token: userToken,
