@@ -200,7 +200,7 @@ function HomePage() {
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { createGame, quickPlay, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId } = useGame()
+  const { createGame, quickPlay, joinRoom, guesses, loading, gameFinished, makeGuess, isConnected, currentRoom, currentGameId, currentGameMode } = useGame()
 
   // Handle URL room parameter
   useEffect(() => {
@@ -269,6 +269,7 @@ function HomePage() {
           <GameInterface
             gameId={currentGameId ? parseInt(currentGameId) : undefined}
             roomId={currentRoom || undefined}
+            gameMode={currentGameMode}
             guesses={guesses}
             onGuess={makeGuess}
             gameFinished={gameFinished}

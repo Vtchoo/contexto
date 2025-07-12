@@ -12,6 +12,7 @@ interface Guess {
 interface GameInterfaceProps {
   gameId?: number
   roomId?: string
+  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | null
   guesses: Guess[]
   onGuess: (word: string) => void
   gameFinished: boolean
@@ -21,6 +22,7 @@ interface GameInterfaceProps {
 function GameInterface({ 
   gameId, 
   roomId,
+  gameMode,
   guesses, 
   onGuess, 
   gameFinished, 
@@ -29,6 +31,16 @@ function GameInterface({
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const getGameModeDisplayName = (mode: string | null) => {
+    const modeNames = {
+      'default': 'Clássico',
+      'competitive': 'Competitivo',
+      'battle-royale': 'Battle Royale',
+      'stop': 'Stop'
+    }
+    return mode ? modeNames[mode as keyof typeof modeNames] || mode : null
+  }
 
   const handleRoomIdClick = async () => {
     if (!roomId) return
@@ -147,6 +159,16 @@ function GameInterface({
         <div className="top-bar">
           <div className="title">
             <h1>CONTEXTO</h1>
+            {gameMode && (
+              <div className="game-mode" style={{
+                fontSize: '0.9em',
+                color: '#666',
+                marginTop: '4px',
+                fontWeight: 'normal'
+              }}>
+                Modo: {getGameModeDisplayName(gameMode)}
+              </div>
+            )}
           </div>
           <button className="btn">⋮</button>
         </div>

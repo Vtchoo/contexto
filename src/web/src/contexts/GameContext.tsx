@@ -7,6 +7,7 @@ interface GameContextType {
   socket: Socket | null
   currentRoom: string | null
   currentGameId: string | null
+  currentGameMode: 'default' | 'competitive' | 'battle-royale' | 'stop' | null
   isConnected: boolean
   loading: boolean
   error: string | null
@@ -33,6 +34,7 @@ export function GameProvider({ children }: GameProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [currentRoom, setCurrentRoom] = useState<string | null>(null)
   const [currentGameId, setCurrentGameId] = useState<string | null>(null)
+  const [currentGameMode, setCurrentGameMode] = useState<'default' | 'competitive' | 'battle-royale' | 'stop' | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -117,6 +119,7 @@ export function GameProvider({ children }: GameProviderProps) {
       setIsConnected(false)
       setCurrentRoom(null)
       setCurrentGameId(null)
+      setCurrentGameMode(null)
     }
   }
 
@@ -134,6 +137,7 @@ export function GameProvider({ children }: GameProviderProps) {
       
       setGuesses([])
       setGameFinished(false)
+      setCurrentGameMode(type) // Store the game mode
       
       return response.roomId.toString()
     } catch (err) {
@@ -214,6 +218,7 @@ export function GameProvider({ children }: GameProviderProps) {
         socket,
         currentRoom,
         currentGameId,
+        currentGameMode,
         isConnected,
         loading,
         error,
