@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { gameApi, User, Guess } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
@@ -9,6 +9,8 @@ interface CurrentGame {
   gameMode: 'default' | 'competitive' | 'battle-royale' | 'stop'
   guesses: Guess[]
   finished: boolean
+  started: boolean
+  isHost: boolean
 }
 
 function useGameHook() {
@@ -44,13 +46,20 @@ function useGameHook() {
     })
 
     newSocket.on('room_joined', (data) => {
-      setCurrentGame(prev => ({
-        roomId: data.roomId,
-        gameId: data.gameId,
-        gameMode: prev?.gameMode || 'default',
-        guesses: prev?.guesses || [],
-        finished: prev?.finished || false
-      }))
+      console.log('Room joined event:', data) // Debug log
+      setCurrentGame(prev => {
+        const newGame = {
+          roomId: data.roomId,
+          gameId: data.gameId,
+          gameMode: prev?.gameMode || 'default',
+          guesses: prev?.guesses || [],
+          finished: prev?.finished || false,
+          started: data.started !== undefined ? data.started : (prev?.started || (prev?.gameMode === 'default' || prev?.gameMode === 'competitive')),
+          isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false)
+        }
+        console.log('Setting currentGame to:', newGame) // Debug log
+        return newGame
+      })
     })
 
     newSocket.on('room_left', () => {
@@ -111,6 +120,16 @@ function useGameHook() {
       }
     })
 
+    newSocket.on('game_started', () => {
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          started: true
+        }
+      })
+    })
+
     newSocket.on('error', (data) => {
       setError(data.message)
     })
@@ -136,17 +155,21 @@ function useGameHook() {
 
       // Join the game room via socket
       if (socket && isConnected) {
-        socket.emit('join_room', { roomId: response.roomId })
+        // socket.emit('join_room', { roomId: response.roomId })
       }
 
       // Initialize the game state
-      setCurrentGame({
+      const initialGame = {
         roomId: response.roomId.toString(),
         gameId: response.gameId?.toString() || response.roomId.toString(),
         gameMode: type,
         guesses: [],
-        finished: false
-      })
+        finished: false,
+        started: type === 'default' || type === 'competitive', // Auto-start for these modes
+        isHost: true // User who creates the game is always the host
+      }
+      console.log('Creating game with initial state:', initialGame) // Debug log
+      setCurrentGame(initialGame)
 
       return response.roomId.toString()
     } catch (err) {
@@ -210,6 +233,15 @@ function useGameHook() {
     }
   }
 
+  const startGame = () => {
+    if (!currentGame?.roomId || !socket || !isConnected) {
+      setError('Não é possível iniciar o jogo')
+      return
+    }
+
+    socket.emit('start_game')
+  }
+
   const clearError = () => {
     setError(null)
   }
@@ -234,6 +266,7 @@ function useGameHook() {
     joinRoom,
     leaveRoom,
     makeGuess,
+    startGame,
     clearError,
   }
 }

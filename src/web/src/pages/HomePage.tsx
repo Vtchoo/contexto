@@ -200,7 +200,7 @@ function HomePage() {
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess } = useGame()
+  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess, startGame } = useGame()
 
   // Handle URL room parameter
   useEffect(() => {
@@ -273,6 +273,9 @@ function HomePage() {
             guesses={currentGame?.guesses || []}
             onGuess={makeGuess}
             gameFinished={currentGame?.finished || false}
+            gameStarted={currentGame?.started || false}
+            isHost={currentGame?.isHost || false}
+            onStartGame={startGame}
             loading={loading}
           />
         </DemoGame>

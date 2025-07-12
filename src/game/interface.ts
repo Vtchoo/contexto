@@ -25,6 +25,7 @@ export interface IGame {
     tryWord(playerId: string, word: string): Promise<GameWord>
     getClosestGuesses(playerId: string, count?: number): GameWord[]
     startGame(): void
+    isHost(playerId: string): boolean
 }
 
 export interface PlayerScore {

@@ -16,6 +16,9 @@ interface GameInterfaceProps {
   guesses: Guess[]
   onGuess: (word: string) => void
   gameFinished: boolean
+  gameStarted: boolean
+  isHost?: boolean
+  onStartGame?: () => void
   loading: boolean
 }
 
@@ -25,7 +28,10 @@ function GameInterface({
   gameMode,
   guesses, 
   onGuess, 
-  gameFinished, 
+  gameFinished,
+  gameStarted,
+  isHost,
+  onStartGame,
   loading 
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
@@ -82,7 +88,7 @@ function GameInterface({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!inputValue.trim() || loading || gameFinished) return
+    if (!inputValue.trim() || loading || gameFinished || !gameStarted) return
 
     const word = inputValue.trim().toLowerCase()
     
@@ -173,6 +179,50 @@ function GameInterface({
           <button className="btn">⋮</button>
         </div>
         
+        {!gameStarted && (gameMode === 'stop' || gameMode === 'battle-royale') && (
+          <div className="start-game-section" style={{
+            textAlign: 'center',
+            padding: '2rem',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+            margin: '1rem 0',
+            border: '2px dashed #28a745'
+          }}>
+            <h3 style={{ color: '#495057', marginBottom: '1rem' }}>
+              🎮 Jogo Aguardando Início
+            </h3>
+            <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
+              {gameMode === 'stop' 
+                ? 'Este é um jogo Stop - todos os jogadores devem começar ao mesmo tempo!'
+                : 'Este é um jogo Battle Royale - todos os jogadores devem começar ao mesmo tempo!'
+              }
+            </p>
+            {isHost ? (
+              <button
+                onClick={onStartGame}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? 'Iniciando...' : '🚀 Iniciar Jogo'}
+              </button>
+            ) : (
+              <p style={{ color: '#6c757d', fontStyle: 'italic' }}>
+                Aguardando o host iniciar o jogo...
+              </p>
+            )}
+          </div>
+        )}
+        
         {isWinner && (
           <div className="end-msg">
             <p>🎉 {strings.game.congratulations}! {strings.game.youWon}</p>
@@ -239,7 +289,7 @@ function GameInterface({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={strings.game.enterWord}
-            disabled={loading || gameFinished}
+            disabled={loading || gameFinished || !gameStarted}
             autoComplete="off"
             autoCapitalize="off"
             enterKeyHint="send"

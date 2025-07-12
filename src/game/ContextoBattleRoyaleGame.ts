@@ -308,6 +308,11 @@ class ContextoBattleRoyaleGame implements IGame {
         return this.players.length
     }
 
+    // Check if a player is the host (first player who created the room)
+    isHost(playerId: string): boolean {
+        return this.players.length > 0 && this.players[0] === playerId
+    }
+
     // Check if the game allows tips
     canUseTips(): boolean {
         return this.allowTips

@@ -100,7 +100,9 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         socket.emit('room_joined', {
           roomId,
           gameId: game.gameId,
-          finished: game.finished
+          finished: game.finished,
+          started: game.started,
+          isHost: game.isHost(socketUser.userId)
         })
 
         console.log(`🏠 User ${socketUser.userId} joined room ${roomId}`)
@@ -216,6 +218,44 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         console.log(`🎯 User ${socketUser.userId} guessed "${word}" in room ${roomId}`)
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // Start game handler
+    socket.on('start_game', () => {
+      try {
+        if (!socketUser || !socketUser.currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const roomId = socketUser.currentRoom
+        const game = gameManager.getGame(roomId)
+        if (!game) {
+          socket.emit('error', { error: 'Game not found' })
+          return
+        }
+
+        // Check if user is the room host (first player)
+        const isHost = game.isHost(socketUser.userId)
+        if (!isHost) {
+          socket.emit('error', { error: 'Only the room host can start the game' })
+          return
+        }
+
+        // Start the game
+        game.startGame()
+
+        // Notify all players in the room that the game has started
+        io.to(roomId).emit('game_started', {
+          roomId,
+          gameId: game.gameId,
+          started: true
+        })
+
+        console.log(`🚀 Game started in room ${roomId} by host ${socketUser.userId}`)
       } catch (error: any) {
         socket.emit('error', { error: error.message })
       }
