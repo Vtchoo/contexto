@@ -41,19 +41,10 @@ class RoomCommand implements ICommand {
     }
 
     private async findGameById(roomId: string, interaction: ChatInputCommandInteraction<'cached'>) {
-        // Check each game type in order
-        const gameGetters = [
-            () => gameManager.getCompetitiveGameInfo(roomId),
-            () => gameManager.getCooperativeGameInfo(roomId),
-            () => gameManager.getStopGameInfo(roomId),
-            () => gameManager.getBattleRoyaleGameInfo(roomId)
-        ]
-
-        for (const getter of gameGetters) {
-            const info = getter()
-            if (info.exists) {
-                return info.game
-            }
+        const gameInfo = gameManager.getGameInfo(roomId)
+        
+        if (gameInfo.exists && gameInfo.game) {
+            return gameInfo.game
         }
 
         await interaction.reply({

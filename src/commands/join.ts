@@ -26,57 +26,46 @@ class JoinCommand implements ICommand {
         }
 
         try {
-            // Try to join as competitive game first
-            const competitiveInfo = gameManager.getCompetitiveGameInfo(gameInstanceId)
-            if (competitiveInfo.exists) {
-                const game = gameManager.joinCompetitiveGame(playerId, gameInstanceId)
+            // Get game info using unified method
+            const gameInfo = gameManager.getGameInfo(gameInstanceId)
+            if (!gameInfo.exists || !gameInfo.game) {
                 await interaction.reply({
-                    content: `🎯 **Você entrou na sala competitiva!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/10\n\nUse \`/c <palavra>\` para fazer suas tentativas.\nUse \`/ranking\` para ver o placar atual.`,
-                    ephemeral: true,
+                    content: `❌ Sala com ID \`${gameInstanceId}\` não encontrada.`,
+                    ephemeral: true
                 })
                 return
             }
 
-            // Try to join as cooperative game
-            const cooperativeInfo = gameManager.getCooperativeGameInfo(gameInstanceId)
-            if (cooperativeInfo.exists) {
-                const game = gameManager.joinCooperativeGame(playerId, gameInstanceId)
+            const game = gameInfo.game
+
+            // Handle different game types
+            if (game instanceof ContextoCompetitiveGame) {
+                const joinedGame = gameManager.joinCompetitiveGame(playerId, gameInstanceId)
                 await interaction.reply({
-                    content: `🤝 **Você entrou na sala cooperativa!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${game.finished ? 'Finalizado' : 'Em andamento'}\n\nUse \`/c <palavra>\` para fazer suas tentativas.`,
+                    content: `🎯 **Você entrou na sala competitiva!**\n\n**Sala ID:** \`${joinedGame.id}\`\n**Jogo:** #${joinedGame.gameId}\n**Jogadores:** ${joinedGame.getPlayerCount()}/10\n\nUse \`/c <palavra>\` para fazer suas tentativas.\nUse \`/ranking\` para ver o placar atual.`,
                     ephemeral: true,
                 })
-                return
-            }
-
-            // Try to join as stop game
-            const stopInfo = gameManager.getStopGameInfo(gameInstanceId)
-            if (stopInfo.exists) {
-                const game = gameManager.joinStopGame(playerId, gameInstanceId)
-                const statusText = game.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
+            } else if (game instanceof ContextoDefaultGame) {
+                const joinedGame = gameManager.joinCooperativeGame(playerId, gameInstanceId)
                 await interaction.reply({
-                    content: `⚡ **Você entrou na sala Stop!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!\n${game.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
+                    content: `🤝 **Você entrou na sala cooperativa!**\n\n**Sala ID:** \`${joinedGame.id}\`\n**Jogo:** #${joinedGame.gameId}\n**Jogadores:** ${joinedGame.getPlayerCount()}/20\n**Status:** ${joinedGame.finished ? 'Finalizado' : 'Em andamento'}\n\nUse \`/c <palavra>\` para fazer suas tentativas.`,
                     ephemeral: true,
                 })
-                return
-            }
-
-            // Try to join as battle royale game
-            const battleRoyaleInfo = gameManager.getBattleRoyaleGameInfo(gameInstanceId)
-            if (battleRoyaleInfo.exists) {
-                const game = gameManager.joinBattleRoyaleGame(playerId, gameInstanceId)
-                const statusText = game.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
+            } else if (game instanceof ContextoStopGame) {
+                const joinedGame = gameManager.joinStopGame(playerId, gameInstanceId)
+                const statusText = joinedGame.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
                 await interaction.reply({
-                    content: `⚔️ **Você entrou na sala Battle Royale!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚔️ **Regras Battle Royale:** O jogo termina quando alguém acerta a palavra. Cada palavra só pode ser usada uma vez!\n${game.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
+                    content: `⚡ **Você entrou na sala Stop!**\n\n**Sala ID:** \`${joinedGame.id}\`\n**Jogo:** #${joinedGame.gameId}\n**Jogadores:** ${joinedGame.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!\n${joinedGame.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
                     ephemeral: true,
                 })
-                return
+            } else if (game instanceof ContextoBattleRoyaleGame) {
+                const joinedGame = gameManager.joinBattleRoyaleGame(playerId, gameInstanceId)
+                const statusText = joinedGame.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
+                await interaction.reply({
+                    content: `⚔️ **Você entrou na sala Battle Royale!**\n\n**Sala ID:** \`${joinedGame.id}\`\n**Jogo:** #${joinedGame.gameId}\n**Jogadores:** ${joinedGame.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚔️ **Regras Battle Royale:** O jogo termina quando alguém acerta a palavra. Cada palavra só pode ser usada uma vez!\n${joinedGame.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
+                    ephemeral: true,
+                })
             }
-
-            // Game not found
-            await interaction.reply({
-                content: `❌ Sala com ID \`${gameInstanceId}\` não encontrada.`,
-                ephemeral: true
-            })
 
         } catch (error) {
             await interaction.reply({

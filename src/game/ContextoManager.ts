@@ -193,43 +193,12 @@ class ContextoManager {
         return game
     }
 
-    // Get information about a competitive game room
-    public getCompetitiveGameInfo(gameInstanceId: string): { game: ContextoCompetitiveGame; exists: boolean } {
+    // Unified method to get any game by ID
+    public getGameInfo(gameInstanceId: string): { game: ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame | null; exists: boolean } {
         const game = this.games.get(gameInstanceId)
-        const isCompetitive = game instanceof ContextoCompetitiveGame
         return {
-            game: isCompetitive ? game : null!,
-            exists: isCompetitive
-        }
-    }
-
-    // Get information about a cooperative game room
-    public getCooperativeGameInfo(gameInstanceId: string): { game: ContextoDefaultGame; exists: boolean } {
-        const game = this.games.get(gameInstanceId)
-        const isCooperative = game instanceof ContextoDefaultGame
-        return {
-            game: isCooperative ? game : null!,
-            exists: isCooperative
-        }
-    }
-
-    // Get information about a stop game room
-    public getStopGameInfo(gameInstanceId: string): { game: ContextoStopGame; exists: boolean } {
-        const game = this.games.get(gameInstanceId)
-        const isStop = game instanceof ContextoStopGame
-        return {
-            game: isStop ? game : null!,
-            exists: isStop
-        }
-    }
-
-    // Get information about a battle royale game room
-    public getBattleRoyaleGameInfo(gameInstanceId: string): { game: ContextoBattleRoyaleGame; exists: boolean } {
-        const game = this.games.get(gameInstanceId)
-        const isBattleRoyale = game instanceof ContextoBattleRoyaleGame
-        return {
-            game: isBattleRoyale ? game : null!,
-            exists: isBattleRoyale
+            game: game || null,
+            exists: !!game
         }
     }
 
@@ -359,6 +328,43 @@ class ContextoManager {
         const today = new Date()
         const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
         return getTodaysGameId() - diffDays
+    }
+
+    // Legacy methods for backward compatibility - internally use getGameInfo
+    public getCompetitiveGameInfo(gameInstanceId: string): { game: ContextoCompetitiveGame; exists: boolean } {
+        const result = this.getGameInfo(gameInstanceId)
+        const isCompetitive = result.game instanceof ContextoCompetitiveGame
+        return {
+            game: isCompetitive ? result.game as ContextoCompetitiveGame : null!,
+            exists: isCompetitive
+        }
+    }
+
+    public getCooperativeGameInfo(gameInstanceId: string): { game: ContextoDefaultGame; exists: boolean } {
+        const result = this.getGameInfo(gameInstanceId)
+        const isCooperative = result.game instanceof ContextoDefaultGame
+        return {
+            game: isCooperative ? result.game as ContextoDefaultGame : null!,
+            exists: isCooperative
+        }
+    }
+
+    public getStopGameInfo(gameInstanceId: string): { game: ContextoStopGame; exists: boolean } {
+        const result = this.getGameInfo(gameInstanceId)
+        const isStop = result.game instanceof ContextoStopGame
+        return {
+            game: isStop ? result.game as ContextoStopGame : null!,
+            exists: isStop
+        }
+    }
+
+    public getBattleRoyaleGameInfo(gameInstanceId: string): { game: ContextoBattleRoyaleGame; exists: boolean } {
+        const result = this.getGameInfo(gameInstanceId)
+        const isBattleRoyale = result.game instanceof ContextoBattleRoyaleGame
+        return {
+            game: isBattleRoyale ? result.game as ContextoBattleRoyaleGame : null!,
+            exists: isBattleRoyale
+        }
     }
 }
 
