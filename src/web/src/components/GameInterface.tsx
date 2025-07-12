@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import styled from 'styled-components'
-import Row from './Row'
+import Row from './original_Row'
 import { strings } from '../constants/strings'
 
 interface Guess {
@@ -12,186 +11,20 @@ interface Guess {
 
 interface GameInterfaceProps {
   gameId?: number
-  roomId?: string
   guesses: Guess[]
   onGuess: (word: string) => void
   gameFinished: boolean
   loading: boolean
 }
 
-const Container = styled.div`
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem;
-`
-
-const GameHeader = styled.div`
-  text-align: center;
-  margin-bottom: 2rem;
-`
-
-const GameTitle = styled.h1`
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--text-color);
-  margin-bottom: 0.5rem;
-  letter-spacing: -0.02em;
-`
-
-const GameInfo = styled.div`
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  margin-bottom: 1rem;
-  color: var(--secondary-text);
-  font-size: 0.9rem;
-`
-
-const InputSection = styled.div`
-  margin-bottom: 2rem;
-`
-
-const InputContainer = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-`
-
-const WordInput = styled.input`
-  flex: 1;
-  padding: 1rem;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--input-bg);
-  color: var(--text-color);
-  font-size: 1rem;
-  transition: all 0.2s ease;
-
-  &:focus {
-    border-color: var(--button-bg);
-    background: var(--bg-color);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  &::placeholder {
-    color: var(--secondary-text);
-  }
-`
-
-const SubmitButton = styled.button`
-  background: var(--button-bg);
-  color: var(--button-text);
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px var(--shadow);
-
-  &:hover:not(:disabled) {
-    background: var(--button-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px var(--shadow);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 2px 4px var(--shadow);
-  }
-`
-
-const GuessesSection = styled.div`
-  margin-top: 2rem;
-`
-
-const GuessesHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-`
-
-const GuessesTitle = styled.h3`
-  color: var(--text-color);
-  font-size: 1.2rem;
-  font-weight: 600;
-`
-
-const GuessCount = styled.span`
-  color: var(--secondary-text);
-  font-size: 0.9rem;
-`
-
-const GuessesList = styled.div`
-  max-height: 400px;
-  overflow-y: auto;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--card-bg);
-`
-
-const EmptyState = styled.div`
-  text-align: center;
-  color: var(--secondary-text);
-  padding: 2rem;
-  font-style: italic;
-`
-
-const WinMessage = styled.div`
-  background: var(--green);
-  color: white;
-  padding: 1rem;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 1rem;
-  font-weight: 600;
-  animation: fadeIn 0.5s ease-out;
-`
-
-const ErrorMessage = styled.div`
-  background: var(--red);
-  color: white;
-  padding: 1rem;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 1rem;
-  font-weight: 500;
-  animation: fadeIn 0.5s ease-out;
-`
-
-const LoadingSpinner = styled.div`
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border-color);
-  border-radius: 50%;
-  border-top-color: var(--button-bg);
-  animation: spin 1s ease-in-out infinite;
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-`
-
 function GameInterface({ 
   gameId, 
-  roomId, 
   guesses, 
   onGuess, 
   gameFinished, 
   loading 
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
-  const [lastGuess, setLastGuess] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Sort guesses by distance (closest first)
@@ -219,7 +52,6 @@ function GameInterface({
       return // Too short
     }
 
-    setLastGuess(word)
     onGuess(word)
     setInputValue('')
   }
@@ -231,83 +63,131 @@ function GameInterface({
   }
 
   const isWinner = sortedGuesses.some(guess => guess.distance === 0)
+  
+  // Get last guess for highlighting
+  const lastGuessData = guesses.length > 0 ? guesses[guesses.length - 1] : null
+
+  // Show message based on game state
+  let message = null
+  
+  if (loading) {
+    message = (
+      <div className="message">
+        <div className="message-text">
+          <div className="loading-text">
+            <span style={{'--i': 1} as React.CSSProperties}>C</span>
+            <span style={{'--i': 2} as React.CSSProperties}>a</span>
+            <span style={{'--i': 3} as React.CSSProperties}>l</span>
+            <span style={{'--i': 4} as React.CSSProperties}>c</span>
+            <span style={{'--i': 5} as React.CSSProperties}>u</span>
+            <span style={{'--i': 6} as React.CSSProperties}>l</span>
+            <span style={{'--i': 7} as React.CSSProperties}>a</span>
+            <span style={{'--i': 8} as React.CSSProperties}>n</span>
+            <span style={{'--i': 9} as React.CSSProperties}>d</span>
+            <span style={{'--i': 10} as React.CSSProperties}>o</span>
+            <span style={{'--i': 11} as React.CSSProperties}>.</span>
+            <span style={{'--i': 12} as React.CSSProperties}>.</span>
+            <span style={{'--i': 13} as React.CSSProperties}>.</span>
+          </div>
+        </div>
+      </div>
+    )
+  } else if (lastGuessData?.error) {
+    message = (
+      <div className="message">
+        <div className="message-text">{lastGuessData.error}</div>
+      </div>
+    )
+  } else if (lastGuessData && !lastGuessData.error) {
+    message = (
+      <div className="message">
+        <div>
+          <Row 
+            // guess={lastGuessData}
+            // highlight={true}
+            word={lastGuessData.word}
+            distance={lastGuessData.distance}
+            highlight={true}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <Container>
-      <GameHeader>
-        <GameTitle>CONTEXTO</GameTitle>
-        <GameInfo>
-          {gameId && <span>JOGO: #{gameId}</span>}
-          {roomId && <span>SALA: {roomId}</span>}
-          <span>TENTATIVAS: {guesses.length}</span>
-        </GameInfo>
-      </GameHeader>
+    <div className="wrapper top-ad-padding">
+      <main>
+        <div className="top-bar">
+          <div className="title">
+            <h1>CONTEXTO</h1>
+          </div>
+          <button className="btn">⋮</button>
+        </div>
+        
+        {isWinner && (
+          <div className="end-msg">
+            <p>🎉 {strings.game.congratulations}! {strings.game.youWon}</p>
+          </div>
+        )}
 
-      {isWinner && (
-        <WinMessage>
-          🎉 {strings.game.congratulations}! {strings.game.youWon}
-        </WinMessage>
-      )}
-
-      <InputSection>
-        <form onSubmit={handleSubmit}>
-          <InputContainer>
-            <WordInput
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={strings.game.enterWord}
-              disabled={loading || gameFinished}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <SubmitButton 
-              type="submit" 
-              disabled={!inputValue.trim() || loading || gameFinished}
-            >
-              {loading ? <LoadingSpinner /> : strings.submit}
-            </SubmitButton>
-          </InputContainer>
-        </form>
-      </InputSection>
-
-      <GuessesSection>
-        <GuessesHeader>
-          <GuessesTitle>Suas tentativas</GuessesTitle>
-          <GuessCount>{guesses.length} tentativa{guesses.length !== 1 ? 's' : ''}</GuessCount>
-        </GuessesHeader>
-
-        <GuessesList>
-          {guesses.length === 0 ? (
-            <EmptyState>
-              Faça sua primeira tentativa para começar!
-            </EmptyState>
-          ) : (
+        <div className="info-bar">
+          {gameId && (
             <>
-              {/* Show valid guesses sorted by distance */}
-              {sortedGuesses.map((guess, index) => (
-                <Row 
-                  key={`${guess.word}-${index}`}
-                  guess={guess}
-                  highlight={guess.word === lastGuess}
-                />
-              ))}
-              
-              {/* Show error guesses at the bottom */}
-              {errorGuesses.map((guess, index) => (
-                <Row 
-                  key={`error-${guess.word}-${index}`}
-                  guess={guess}
-                  highlight={guess.word === lastGuess}
-                />
-              ))}
+              <span className="label">JOGO:</span>{' '}
+              <span>#{gameId}</span>
+              &nbsp;&nbsp;
             </>
           )}
-        </GuessesList>
-      </GuessesSection>
-    </Container>
+          <span className="label">TENTATIVAS:</span>{' '}
+          <span>{guesses.length}</span>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            ref={inputRef}
+            className="word"
+            type="text"
+            name="word"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={strings.game.enterWord}
+            disabled={loading || gameFinished}
+            autoComplete="off"
+            autoCapitalize="off"
+            enterKeyHint="send"
+          />
+        </form>
+
+        {message}
+
+        <div className="guess-history">
+          {/* Show valid guesses sorted by distance */}
+          {sortedGuesses.map((guess, index) => (
+            // <Row 
+            //   key={`${guess.word}-${index}`}
+            //   guess={guess}
+            //   highlight={false}
+            // />
+            <Row 
+              key={`${guess.word}-${index}`}
+              word={guess.word}
+              distance={guess.distance}
+              highlight={lastGuessData?.word === guess.word}
+            />
+          ))}
+          
+          {/* Show error guesses at the bottom */}
+          {/* {errorGuesses.map((guess, index) => (
+            <Row 
+              key={`error-${guess.word}-${index}`}
+              guess={guess}
+              highlight={false}
+            />
+          ))} */}
+        </div>
+      </main>
+    </div>
   )
 }
 
