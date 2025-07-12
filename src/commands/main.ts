@@ -365,23 +365,28 @@ class MainCommand implements ICommand {
             resultsText += `📊 **Ranking Final (por distância mais próxima):**\n`
             leaderboard.forEach((player, index) => {
                 const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}º`
-                const distanceText = player.closestDistance === 999999 ? 'Sem palpites válidos' : `${player.closestDistance + 1} (${player.closestWord})`
+                let distanceText = ''
+                if (player.closestDistance === 999999) {
+                    distanceText = 'Sem palpites válidos'
+                } else {
+                    // Pad the closest word to constant length and wrap in spoiler
+                    const paddedWord = player.closestWord.padEnd(15, ' ')
+                    distanceText = `${player.closestDistance + 1} (||${paddedWord}||)`
+                }
                 resultsText += `${medal} <@${player.playerId}>: ${distanceText}\n`
             })
         }
 
-        // Check if this is today's game to avoid spoiling the answer
-        const todaysGameId = getTodaysGameId()
-        if (game.gameId !== todaysGameId) {
-            // Show the answer for past games
-            try {
-                const gameWord = await game.getGameWord()
-                if (gameWord && gameWord.word) {
-                    resultsText += `\n💡 **Resposta:** ${gameWord.word}`
-                }
-            } catch (error) {
-                // Ignore error, don't show answer
+        // Show the answer with spoiler protection for all games
+        try {
+            const gameWord = await game.getGameWord()
+            if (gameWord && gameWord.word) {
+                // Pad the word to a constant length to hide word length
+                const paddedWord = gameWord.word.padEnd(15, ' ')
+                resultsText += `\n💡 **Resposta:** ||${paddedWord}||`
             }
+        } catch (error) {
+            // Ignore error, don't show answer
         }
 
         resultsText += `\n\n🎮 Jogue novamente com \`/create mode:stop\``
@@ -401,14 +406,12 @@ class MainCommand implements ICommand {
         resultsText += `🎯 **Descoberto por:** <@${winnerId}>\n`
         resultsText += `🤝 **Esforço colaborativo:** ${totalGuesses} tentativas${playerCount > 1 ? ` (${playerCount} jogadores)` : ''}\n\n`
 
-        // Check if this is today's game to avoid spoiling the answer
-        const todaysGameId = getTodaysGameId()
-        if (game.gameId !== todaysGameId) {
-            // Try to find the winning word (distance 0) from the guesses
-            const winningGuess = game.getClosestGuesses(winnerId)[0] // The closest guess should be the winning one with distance 0
-            if (winningGuess && winningGuess.distance === 0) {
-                resultsText += `💡 **Resposta:** ${winningGuess.word}\n\n`
-            }
+        // Show the answer with spoiler protection (constant length padding)
+        const winningGuess = game.getClosestGuesses(winnerId)[0] // The closest guess should be the winning one with distance 0
+        if (winningGuess && winningGuess.distance === 0) {
+            // Pad the word to a constant length to hide word length
+            const paddedWord = winningGuess.word.padEnd(15, ' ')
+            resultsText += `💡 **Resposta:** ||${paddedWord}||\n\n`
         }
 
         const gameDate = this.formatGameDate(game.gameId)
