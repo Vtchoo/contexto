@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
 import { getBarColor, getBarWidth, getTodaysGameId } from "../game/utils/misc"
 import { parseISO } from "date-fns"
 
@@ -51,6 +51,11 @@ class MainCommand implements ICommand {
         // If player is in a Stop game, handle it differently (no creation, just guessing)
         if (currentGame instanceof ContextoStopGame) {
             return this.handleStopGame(interaction, currentGame, word, playerId)
+        }
+
+        // If player is in a Battle Royale game, handle it differently (no creation, just guessing)
+        if (currentGame instanceof ContextoBattleRoyaleGame) {
+            return this.handleBattleRoyaleGame(interaction, currentGame, word, playerId)
         }
 
         // Parse date if provided
@@ -283,6 +288,90 @@ class MainCommand implements ICommand {
         }
     }
 
+    private async handleBattleRoyaleGame(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoBattleRoyaleGame, word: string | null, playerId: string) {
+        if (!word) {
+            await interaction.reply({
+                content: `⚔️ **Sala Battle Royale**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}${this.formatGameDate(game.gameId)}\n**Status:** ${game.started ? 'Em andamento' : 'Aguardando início'}\n**Jogadores:** ${game.getPlayerCount()}\n\n${!game.started ? '⏳ **Aguardando início:** Use \`/start\` para iniciar o jogo.\n\n' : '⚔️ **Jogo ativo!** Use \`/c <palavra>\` para fazer suas tentativas.\n\n'}⚔️ **Regras Battle Royale:** O jogo termina quando alguém acerta a palavra. Cada palavra só pode ser usada uma vez!\n\nUse \`/room\` para ver informações da sala.`,
+                ephemeral: true
+            })
+            return
+        }
+
+        if (!game.started) {
+            await interaction.reply({
+                content: "❌ O jogo ainda não foi iniciado! Use `/start` para iniciar o jogo Battle Royale.",
+                ephemeral: true
+            })
+            return
+        }
+
+        if (game.finished) {
+            await interaction.reply({
+                content: `🏁 O jogo Battle Royale já foi finalizado! Crie uma nova sala com \`/create mode:battle-royale\` para jogar novamente.`,
+                ephemeral: true,
+            })
+            return
+        }
+
+        const alreadyPlayed = game.getExistingGuess(word, playerId)
+
+        if (alreadyPlayed) {
+            if (alreadyPlayed.error) {
+                await interaction.reply({
+                    content: alreadyPlayed.error,
+                    ephemeral: true,
+                })
+                return
+            }
+
+            await interaction.reply({
+                content: `Você já tentou a palavra ${word}. (${(alreadyPlayed.distance || 0) + 1})`,
+                ephemeral: true,
+            })
+            return
+        }
+
+        const result = await game.tryWord(playerId, word)
+        if (result) {
+            if (result.error) {
+                await interaction.reply({
+                    content: result.error,
+                    ephemeral: true,
+                })
+                return
+            }
+
+            // Check if this guess ended the game
+            if (result.distance === 0) {
+                // Player found the answer! End game and broadcast results
+                const closestGuesses = game.getClosestGuesses(playerId)
+                await this.sendBattleRoyaleGameResponse(interaction, game, result, closestGuesses, playerId)
+                
+                // Broadcast final results to the guild
+                await this.broadcastBattleRoyaleGameResults(interaction, game)
+                return
+            }
+
+            // Game continues - show player's result and current standings
+            const closestGuesses = game.getClosestGuesses(playerId)
+            const progress = game.getAllPlayersProgress()
+            
+            let progressText = ''
+            if (progress.length > 1) {
+                progressText = '\n\n**📊 Progresso dos jogadores (10 melhores):**\n'
+                progress.slice(0, 10).forEach((player, index) => {
+                    const isCurrentPlayer = player.playerId === playerId
+                    const indicator = isCurrentPlayer ? '👤' : '🔹'
+                    // Hide closest words in spoilers with padding
+                    const paddedWord = player.closestWord ? player.closestWord.padEnd(15, ' ') : 'Nenhuma'.padEnd(15, ' ')
+                    progressText += `${indicator} <@${player.playerId}>: ${player.closestDistance + 1} (||${paddedWord}||)\n`
+                })
+            }
+
+            return this.sendBattleRoyaleGameResponse(interaction, game, result, closestGuesses, playerId, progressText)
+        }
+    }
+
     private async sendGameResponse(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoDefaultGame | ContextoCompetitiveGame, result: any, closestGuesses: any[], mode: 'default' | 'competitive', playerId?: string) {
         if (closestGuesses.length > 0) {
             const guessesFormatting = [result, ...closestGuesses].map(guess => ({
@@ -425,6 +514,52 @@ class MainCommand implements ICommand {
         })
     }
 
+    private async broadcastBattleRoyaleGameResults(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoBattleRoyaleGame) {
+        const leaderboard = game.getLeaderboard()
+        const winner = game.getWinner()
+        
+        if (!winner) return
+
+        let resultsText = `⚔️ **Jogo Battle Royale #${game.gameId} Finalizado!**\n\n`
+        resultsText += `🎯 **Vencedor:** <@${winner.playerId}> (${winner.guessCount} tentativas)\n\n`
+        
+        if (leaderboard.length > 1) {
+            resultsText += `📊 **Ranking Final (por distância mais próxima):**\n`
+            leaderboard.forEach((player, index) => {
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}º`
+                let distanceText = ''
+                if (player.closestDistance === 999999) {
+                    distanceText = 'Sem palpites válidos'
+                } else {
+                    // Pad the closest word to constant length and wrap in spoiler
+                    const paddedWord = player.closestWord.padEnd(15, ' ')
+                    distanceText = `${player.closestDistance + 1} (||${paddedWord}||)`
+                }
+                resultsText += `${medal} <@${player.playerId}>: ${distanceText}\n`
+            })
+        }
+
+        // Show the answer with spoiler protection for all games
+        try {
+            const gameWord = await game.getGameWord()
+            if (gameWord && gameWord.word) {
+                // Pad the word to a constant length to hide word length
+                const paddedWord = gameWord.word.padEnd(15, ' ')
+                resultsText += `\n💡 **Resposta:** ||${paddedWord}||`
+            }
+        } catch (error) {
+            // Ignore error, don't show answer
+        }
+
+        resultsText += `\n\n🎮 Jogue novamente com \`/create mode:battle-royale\``
+
+        // Send to the channel (not ephemeral)
+        await interaction.followUp({
+            content: resultsText,
+            ephemeral: false
+        })
+    }
+
     private async sendStopGameResponse(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoStopGame, result: any, closestGuesses: any[], playerId: string, additionalText?: string) {
         if (closestGuesses.length > 0) {
             const guessesFormatting = [result, ...closestGuesses].map(guess => ({
@@ -454,6 +589,64 @@ class MainCommand implements ICommand {
             if (result.distance === 0) {
                 const playerGuessCount = game.getPlayerGuessCount(playerId)
                 finishedGameText = `⚡ Parabéns!\n\nVocê acertou a palavra #${game.gameId} em ${playerGuessCount} tentativas e venceu o jogo Stop!\n\n\n`
+            }
+
+            const playerGuessCount = game.getPlayerGuessCount(playerId)
+            const gameDate = this.formatGameDate(game.gameId)
+            guessCountText = `Jogo: #${game.gameId}${gameDate} Suas tentativas: ${playerGuessCount}\n\n`
+
+            let content = `\`\`\`ansi\n` +
+                finishedGameText +
+                guessCountText +
+                `${rows.join('\n')}\n\n\n` +
+                `\`\`\``
+
+            if (additionalText) {
+                content += additionalText
+            }
+
+            await interaction.reply({
+                content,
+                ephemeral: true,
+            })
+            return
+        }
+
+        await interaction.reply({
+            content: `\`\`\`You guessed the word: ${result.word}\n\n\n${JSON.stringify(result, null, 2)}\`\`\``,
+            ephemeral: true
+        })
+    }
+
+    private async sendBattleRoyaleGameResponse(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoBattleRoyaleGame, result: any, closestGuesses: any[], playerId: string, additionalText?: string) {
+        if (closestGuesses.length > 0) {
+            const guessesFormatting = [result, ...closestGuesses].map(guess => ({
+                text: guess.word,
+                lemma: guess.lemma,
+                distance: guess.distance,
+                color: getBarColor(guess.distance || 0),
+                width: getBarWidth(guess.distance || 0), // 0 to 100
+            }))
+
+            const rows = guessesFormatting.map((guess, i) => {
+                // should format like this: [word██████████████----------------]
+                // color the bar with ANSI colors
+                // and the word with the color of the bar
+                // if word is too long, color only the characters that fit in the bar
+                const barWidth = Math.floor(guess.width * TOTAL_BAR_WIDTH / 100)
+                const barFill = '█'.repeat(Math.max(barWidth - guess.text.length, 0))
+                const remainingWidth = TOTAL_BAR_WIDTH - Math.max(barWidth, guess.text.length)
+                const remainingBar = '-'.repeat(remainingWidth)
+
+                return `[${convertColorToAnsi(guess.color)}${guess.text}${barFill}\u001b[0m${remainingBar}] ${(guess.distance || 0) + 1}${i === 0 ? '\n' : ''}`
+            })
+
+            let finishedGameText = ''
+            let guessCountText = ''
+            
+            if (result.distance === 0) {
+                const playerGuessCount = game.getPlayerGuessCount(playerId)
+                finishedGameText = `⚔️ Parabéns!\n\nVocê acertou a palavra #${game.gameId} em ${playerGuessCount} tentativas e venceu o jogo Battle Royale!\n\n\n`
             }
 
             const playerGuessCount = game.getPlayerGuessCount(playerId)

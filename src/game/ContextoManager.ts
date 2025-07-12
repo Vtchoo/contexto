@@ -4,14 +4,16 @@ import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
 import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
 import { ContextoStopGame } from './ContextoStopGame'
+import { ContextoBattleRoyaleGame } from './ContextoBattleRoyaleGame'
 
 class ContextoManager {
 
     private defaultGames: Map<string, ContextoDefaultGame> = new Map()
     private competitiveGames: Map<string, ContextoCompetitiveGame> = new Map()
     private stopGames: Map<string, ContextoStopGame> = new Map()
+    private battleRoyaleGames: Map<string, ContextoBattleRoyaleGame> = new Map()
     private playerGames: Map<string, string> = new Map() // playerId -> gameId , used to track which game a player is currently playing
-    private gameTypes: Map<string, 'default' | 'competitive' | 'stop'> = new Map() // gameId -> game type
+    private gameTypes: Map<string, 'default' | 'competitive' | 'stop' | 'battle-royale'> = new Map() // gameId -> game type
 
     private memoryCache: Map<string, GameWord> = new Map() // In-memory cache for fast access during session
 
@@ -28,7 +30,7 @@ class ContextoManager {
         return [game, justStarted] as const
     }
 
-    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | undefined {
+    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame | undefined {
         const gameId = this.playerGames.get(playerId)
         if (gameId) {
             const gameType = this.gameTypes.get(gameId)
@@ -36,6 +38,8 @@ class ContextoManager {
                 return this.competitiveGames.get(gameId)
             } else if (gameType === 'stop') {
                 return this.stopGames.get(gameId)
+            } else if (gameType === 'battle-royale') {
+                return this.battleRoyaleGames.get(gameId)
             } else {
                 return this.defaultGames.get(gameId)
             }
@@ -43,7 +47,7 @@ class ContextoManager {
         return undefined
     }
 
-    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' = 'default', gameIdOrDate?: number | Date) {
+    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default', gameIdOrDate?: number | Date) {
         if (gameType === 'competitive') {
             // Create a new competitive game room
             const game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
@@ -57,6 +61,13 @@ class ContextoManager {
             this.stopGames.set(game.id, game)
             this.playerGames.set(playerId, game.id)
             this.gameTypes.set(game.id, 'stop')
+            return game
+        } else if (gameType === 'battle-royale') {
+            // Create a new battle royale game room
+            const game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
+            this.battleRoyaleGames.set(game.id, game)
+            this.playerGames.set(playerId, game.id)
+            this.gameTypes.set(game.id, 'battle-royale')
             return game
         } else {
             const game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
@@ -166,6 +177,39 @@ class ContextoManager {
         return game
     }
 
+    // Join a specific battle royale game by its instance ID (like a private room/lobby)
+    public joinBattleRoyaleGame(playerId: string, gameInstanceId: string): ContextoBattleRoyaleGame {
+        // Check if player is already in a battle royale game
+        const currentGame = this.getCurrentPlayerGame(playerId)
+        if (currentGame && currentGame instanceof ContextoBattleRoyaleGame) {
+            if (currentGame.id === gameInstanceId) {
+                return currentGame // Already in this game
+            }
+            throw new Error("You are already in another battle royale game. Use /leave first.")
+        }
+
+        // Find the specific battle royale game by its instance ID
+        const game = this.battleRoyaleGames.get(gameInstanceId)
+        if (!game) {
+            throw new Error(`Battle Royale game with ID ${gameInstanceId} not found`)
+        }
+
+        // Check if game has room for more players (battle royale games can have more players)
+        if (game.getPlayerCount() >= 20) {
+            throw new Error("This battle royale game is full (max 20 players)")
+        }
+
+        // Check if game is already finished
+        if (game.finished) {
+            throw new Error("This battle royale game has already been completed")
+        }
+
+        // Add player to the game
+        game.addPlayer(playerId)
+        this.playerGames.set(playerId, game.id)
+        return game
+    }
+
     // Get information about a competitive game room
     public getCompetitiveGameInfo(gameInstanceId: string): { game: ContextoCompetitiveGame; exists: boolean } {
         const game = this.competitiveGames.get(gameInstanceId)
@@ -187,6 +231,15 @@ class ContextoManager {
     // Get information about a stop game room
     public getStopGameInfo(gameInstanceId: string): { game: ContextoStopGame; exists: boolean } {
         const game = this.stopGames.get(gameInstanceId)
+        return {
+            game: game!,
+            exists: !!game
+        }
+    }
+
+    // Get information about a battle royale game room
+    public getBattleRoyaleGameInfo(gameInstanceId: string): { game: ContextoBattleRoyaleGame; exists: boolean } {
+        const game = this.battleRoyaleGames.get(gameInstanceId)
         return {
             game: game!,
             exists: !!game
@@ -291,6 +344,16 @@ class ContextoManager {
                 if (game) {
                     game.removePlayer(playerId)
                 }
+            } else if (gameType === 'stop') {
+                const game = this.stopGames.get(gameId)
+                if (game) {
+                    game.removePlayer(playerId)
+                }
+            } else if (gameType === 'battle-royale') {
+                const game = this.battleRoyaleGames.get(gameId)
+                if (game) {
+                    game.removePlayer(playerId)
+                }
             } else {
                 const game = this.defaultGames.get(gameId)
                 if (game) {
@@ -313,7 +376,7 @@ class ContextoManager {
     }
 
     // Convenience method to create a game for a specific date
-    public createGameForDate(playerId: string, date: Date, gameType: 'default' | 'competitive' = 'default') {
+    public createGameForDate(playerId: string, date: Date, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default') {
         return this.createNewGame(playerId, gameType, date)
     }
 

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
 
 class JoinCommand implements ICommand {
 
@@ -55,6 +55,18 @@ class JoinCommand implements ICommand {
                 const statusText = game.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
                 await interaction.reply({
                     content: `⚡ **Você entrou na sala Stop!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!\n${game.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
+                    ephemeral: true,
+                })
+                return
+            }
+
+            // Try to join as battle royale game
+            const battleRoyaleInfo = gameManager.getBattleRoyaleGameInfo(gameInstanceId)
+            if (battleRoyaleInfo.exists) {
+                const game = gameManager.joinBattleRoyaleGame(playerId, gameInstanceId)
+                const statusText = game.started ? "🟢 Iniciado" : "🔴 Aguardando /start"
+                await interaction.reply({
+                    content: `⚔️ **Você entrou na sala Battle Royale!**\n\n**Sala ID:** \`${game.id}\`\n**Jogo:** #${game.gameId}\n**Jogadores:** ${game.getPlayerCount()}/20\n**Status:** ${statusText}\n\n⚔️ **Regras Battle Royale:** O jogo termina quando alguém acerta a palavra. Cada palavra só pode ser usada uma vez!\n${game.started ? 'Use `/c <palavra>` para fazer suas tentativas.' : '🚀 Aguarde o `/start` para começar!'}`,
                     ephemeral: true,
                 })
                 return

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
 import { parseISO } from "date-fns"
 
 class CreateCommand implements ICommand {
@@ -14,7 +14,8 @@ class CreateCommand implements ICommand {
                 .addChoices(
                     { name: "Cooperativa (padrão)", value: "default" },
                     { name: "Competitiva", value: "competitive" },
-                    { name: "Stop (termina quando alguém acerta)", value: "stop" }
+                    { name: "Stop (termina quando alguém acerta)", value: "stop" },
+                    { name: "Battle Royale (palavras únicas)", value: "battle-royale" }
                 )
         )
         .addIntegerOption(option =>
@@ -31,7 +32,7 @@ class CreateCommand implements ICommand {
 
     async execute({ client, interaction }: CommandHandlerParams) {
         const playerId = interaction.user.id
-        const mode = interaction.options.getString("mode") as 'default' | 'competitive' | 'stop' | null
+        const mode = interaction.options.getString("mode") as 'default' | 'competitive' | 'stop' | 'battle-royale' | null
         const gameId = interaction.options.getInteger("game-id")
         const dateString = interaction.options.getString("date")
 
@@ -53,6 +54,11 @@ class CreateCommand implements ICommand {
             } else if (currentGame instanceof ContextoStopGame) {
                 await interaction.reply({
                     content: `Você já criou/entrou na sala stop \`${currentGame.id}\`. Use \`/leave\` primeiro para sair.`,
+                    ephemeral: true,
+                })
+            } else if (currentGame instanceof ContextoBattleRoyaleGame) {
+                await interaction.reply({
+                    content: `Você já criou/entrou na sala battle royale \`${currentGame.id}\`. Use \`/leave\` primeiro para sair.`,
                     ephemeral: true,
                 })
             }
@@ -87,6 +93,11 @@ class CreateCommand implements ICommand {
             } else if (game instanceof ContextoStopGame) {
                 await interaction.reply({
                     content: `⚡ **Sala Stop criada!**\n\n**ID da Sala:** \`${game.id}\`\n**Jogo Contexto:** #${game.gameId}\n**Criador:** <@${playerId}>\n**Jogadores:** 1/20\n**Status:** 🔴 Não iniciada\n\n📋 **Compartilhe este ID para outros jogadores entrarem:**\n\`/join ${game.id}\`\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!\n\n🚀 **Para iniciar:** Use \`/start\` quando todos estiverem prontos (modo time-critical!)`,
+                    ephemeral: false, // Make this public so others can see the room ID
+                })
+            } else if (game instanceof ContextoBattleRoyaleGame) {
+                await interaction.reply({
+                    content: `⚔️ **Sala Battle Royale criada!**\n\n**ID da Sala:** \`${game.id}\`\n**Jogo Contexto:** #${game.gameId}\n**Criador:** <@${playerId}>\n**Jogadores:** 1/20\n**Status:** 🔴 Não iniciada\n\n📋 **Compartilhe este ID para outros jogadores entrarem:**\n\`/join ${game.id}\`\n\n⚔️ **Regras Battle Royale:** O jogo termina quando alguém acerta a palavra. Cada palavra só pode ser usada uma vez!\n\n🚀 **Para iniciar:** Use \`/start\` quando todos estiverem prontos!`,
                     ephemeral: false, // Make this public so others can see the room ID
                 })
             } else {

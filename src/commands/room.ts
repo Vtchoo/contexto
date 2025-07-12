@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from "../game"
+import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
 
 class RoomCommand implements ICommand {
 
@@ -17,7 +17,7 @@ class RoomCommand implements ICommand {
         const playerId = interaction.user.id
         const roomId = interaction.options.getString("id")
 
-        let game: ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | undefined
+        let game: ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | ContextoBattleRoyaleGame | undefined
 
         if (roomId) {
             // Check specific room ID - try competitive first, then cooperative, then stop
@@ -33,11 +33,16 @@ class RoomCommand implements ICommand {
                     if (stopInfo.exists) {
                         game = stopInfo.game
                     } else {
-                        await interaction.reply({
-                            content: `❌ Sala com ID \`${roomId}\` não encontrada.`,
-                            ephemeral: true
-                        })
-                        return
+                        const battleRoyaleInfo = gameManager.getBattleRoyaleGameInfo(roomId)
+                        if (battleRoyaleInfo.exists) {
+                            game = battleRoyaleInfo.game
+                        } else {
+                            await interaction.reply({
+                                content: `❌ Sala com ID \`${roomId}\` não encontrada.`,
+                                ephemeral: true
+                            })
+                            return
+                        }
                     }
                 }
             }
@@ -60,6 +65,8 @@ class RoomCommand implements ICommand {
             return this.showCooperativeRoomInfo(interaction, game, roomId || undefined)
         } else if (game instanceof ContextoStopGame) {
             return this.showStopRoomInfo(interaction, game, roomId || undefined)
+        } else if (game instanceof ContextoBattleRoyaleGame) {
+            return this.showBattleRoyaleRoomInfo(interaction, game, roomId || undefined)
         }
     }
 
@@ -161,6 +168,50 @@ class RoomCommand implements ICommand {
                 progressText +
                 `\n\n📋 **Para convidar outros:**\n\`/join ${game.id}\`\n\n⚡ **Regras Stop:** O jogo termina quando alguém acerta a palavra. Ranking por distância mais próxima!`,
             ephemeral: roomId ? true : false
+        })
+    }
+
+    private async showBattleRoyaleRoomInfo(interaction: any, game: ContextoBattleRoyaleGame, roomId?: string) {
+        const progress = game.getAllPlayersProgress()
+        
+        let progressText = ""
+        if (progress.length > 0) {
+            progressText = `📊 **Progresso dos jogadores:**\n`
+            progress.slice(0, 10).forEach((player, index) => {
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🔹'
+                // Hide closest words in spoilers with padding
+                const paddedWord = player.closestWord ? player.closestWord.padEnd(15, ' ') : 'Nenhuma'.padEnd(15, ' ')
+                progressText += `${medal} <@${player.playerId}>: ${player.closestDistance + 1} (||${paddedWord}||) - ${player.guessCount} tentativas\n`
+            })
+            progressText += `\n`
+        } else {
+            progressText = `📊 **Nenhum jogador fez palpites ainda.**\n\n`
+        }
+
+        const statusEmoji = game.finished ? '🏁' : game.started ? '🟢' : '🔴'
+        const statusText = game.finished ? 'Finalizado' : game.started ? 'Em andamento' : 'Aguardando início'
+
+        let winnerText = ""
+        if (game.finished) {
+            const winner = game.getWinner()
+            if (winner) {
+                winnerText = `🎯 **Vencedor:** <@${winner.playerId}> (${winner.guessCount} tentativas)\n\n`
+            }
+        }
+
+        await interaction.reply({
+            content: `⚔️ **Sala Battle Royale${roomId ? ` (ID: ${roomId})` : ''}**\n\n` +
+                    `**Jogo:** #${game.gameId}\n` +
+                    `**Status:** ${statusEmoji} ${statusText}\n` +
+                    `**Jogadores:** ${game.getPlayerCount()}/20\n\n` +
+                    winnerText +
+                    progressText +
+                    `⚔️ **Regras Battle Royale:** Cada palavra só pode ser usada uma vez!\n` +
+                    `🏁 **Objetivo:** Seja o primeiro a acertar a palavra!\n\n` +
+                    `${!game.started && !game.finished ? '🚀 Use `/start` para iniciar o jogo.\n' : ''}` +
+                    `${game.started && !game.finished ? '🎮 Use `/c <palavra>` para fazer suas tentativas.\n' : ''}` +
+                    `${game.finished ? '🎮 Crie uma nova sala com `/create mode:battle-royale`' : ''}`,
+            ephemeral: true
         })
     }
 }
