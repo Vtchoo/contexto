@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
 import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
+import snowflakeGenerator from "../utils/snowflake"
 
 class JoinCommand implements ICommand {
 
@@ -20,6 +21,15 @@ class JoinCommand implements ICommand {
         if (!gameInstanceId) {
             await interaction.reply({
                 content: "❌ Você deve especificar o ID da sala para entrar!",
+                ephemeral: true
+            })
+            return
+        }
+
+        // Validate the game ID format
+        if (!snowflakeGenerator.isValid(gameInstanceId)) {
+            await interaction.reply({
+                content: `❌ ID de sala inválido: \`${gameInstanceId}\`\n\nO ID deve conter apenas letras e números (6-12 caracteres).`,
                 ephemeral: true
             })
             return

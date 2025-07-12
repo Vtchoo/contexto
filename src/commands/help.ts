@@ -70,6 +70,7 @@ class HelpCommand implements ICommand {
                         "• `/c <palavra>` - Cria sala e joga imediatamente\n" +
                         "• `/create` - Cria sala vazia para outros entrarem\n" +
                         "• `/join <id>` - Entra em sala existente\n" +
+                        "• **IDs são curtos e fáceis:** Ex: `3RFJ22A` (6-7 caracteres)\n" +
                         "• Compartilhe o ID da sala para convidar outros!",
                     inline: false
                 },

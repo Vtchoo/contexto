@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
 import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
+import snowflakeGenerator from "../utils/snowflake"
 
 class RoomCommand implements ICommand {
 
@@ -41,6 +42,15 @@ class RoomCommand implements ICommand {
     }
 
     private async findGameById(roomId: string, interaction: ChatInputCommandInteraction<'cached'>) {
+        // Validate the game ID format first
+        if (!snowflakeGenerator.isValid(roomId)) {
+            await interaction.reply({
+                content: `❌ ID de sala inválido: \`${roomId}\`\n\nO ID deve conter apenas letras e números (6-12 caracteres).`,
+                ephemeral: true
+            })
+            return null
+        }
+
         const gameInfo = gameManager.getGameInfo(roomId)
         
         if (gameInfo.exists && gameInfo.game) {

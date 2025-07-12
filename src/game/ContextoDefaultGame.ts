@@ -1,7 +1,7 @@
 import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance, nextTipDistance, randomTipDistance } from './utils/misc'
-import { v4 as uuid } from 'uuid'
+import snowflakeGenerator from '../utils/snowflake'
 import { GameWord, Guess, IGame } from './interface'
 import type { ContextoManager } from './ContextoManager'
 
@@ -13,7 +13,7 @@ class ContextoDefaultGame implements IGame {
     private readonly players: string[] // List of player IDs in the game
     private readonly guesses: Guess[] = [] // List of guesses made by players
 
-    public readonly id = uuid()
+    public readonly id = snowflakeGenerator.generate()
     public readonly gameId: number
 
     allowTips = true // Whether players can request tips

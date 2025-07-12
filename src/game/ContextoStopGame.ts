@@ -1,7 +1,7 @@
 import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId } from './utils/misc'
-import { v4 as uuid } from 'uuid'
+import snowflakeGenerator from '../utils/snowflake'
 import { GameWord, Guess, IGame, PlayerScore } from './interface'
 import type { ContextoManager } from './ContextoManager'
 
@@ -10,7 +10,7 @@ class ContextoStopGame implements IGame {
     private readonly manager: ContextoManager
     private readonly gameApi: ReturnType<typeof GameApi>
 
-    public readonly id = uuid()
+    public readonly id = snowflakeGenerator.generate()
     gameId: number
     players: string[] = []
     private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
