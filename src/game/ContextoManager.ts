@@ -61,135 +61,84 @@ class ContextoManager {
         }
     }
 
-    // Join a specific competitive game by its instance ID (like a private room/lobby)
+    // Unified method to join any game by ID
+    public joinGame(playerId: string, gameInstanceId: string): ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame {
+        // Check if player is already in a game
+        const currentGame = this.getCurrentPlayerGame(playerId)
+        if (currentGame) {
+            if (currentGame.id === gameInstanceId) {
+                return currentGame // Already in this game
+            }
+            // Leave current game first
+            this.leaveCurrentGame(playerId)
+        }
+
+        // Find the game by ID
+        const gameInfo = this.getGameInfo(gameInstanceId)
+        if (!gameInfo.exists || !gameInfo.game) {
+            throw new Error(`Game with ID ${gameInstanceId} not found`)
+        }
+
+        const game = gameInfo.game
+
+        // Check if game is already finished
+        if (game.finished) {
+            throw new Error("This game has already been completed")
+        }
+
+        // Type-specific validations
+        if (game instanceof ContextoCompetitiveGame) {
+            // Check if game has room for more players
+            if (game.players.length >= 10) {
+                throw new Error("This competitive game is full (max 10 players)")
+            }
+            // Check if player already completed this game
+            if (game.hasPlayerCompleted(playerId)) {
+                throw new Error("You have already completed this game")
+            }
+        } else {
+            // For default, stop, and battle-royale games
+            if (game.getPlayerCount() >= 20) {
+                throw new Error("This game is full (max 20 players)")
+            }
+        }
+
+        // Add player to the game
+        game.addPlayer(playerId)
+        this.playerGames.set(playerId, game.id)
+        return game
+    }
+
+    // Convenience methods for backward compatibility (optional - can be removed if not needed)
     public joinCompetitiveGame(playerId: string, gameInstanceId: string): ContextoCompetitiveGame {
-        // Check if player is already in a competitive game
-        const currentGame = this.getCurrentPlayerGame(playerId)
-        if (currentGame && currentGame instanceof ContextoCompetitiveGame) {
-            if (currentGame.id === gameInstanceId) {
-                return currentGame // Already in this game
-            }
-            throw new Error("You are already in another competitive game. Use /leave first.")
+        const game = this.joinGame(playerId, gameInstanceId)
+        if (!(game instanceof ContextoCompetitiveGame)) {
+            throw new Error(`Game ${gameInstanceId} is not a competitive game`)
         }
-
-        // Find the specific competitive game by its instance ID
-        const game = this.games.get(gameInstanceId)
-        if (!game || !(game instanceof ContextoCompetitiveGame)) {
-            throw new Error(`Competitive game with ID ${gameInstanceId} not found`)
-        }
-
-        // Check if game has room for more players
-        if (game.players.length >= 10) {
-            throw new Error("This competitive game is full (max 10 players)")
-        }
-
-        // Check if player already completed this game
-        if (game.hasPlayerCompleted(playerId)) {
-            throw new Error("You have already completed this game")
-        }
-
-        // Add player to the game
-        game.addPlayer(playerId)
-        this.playerGames.set(playerId, game.id)
         return game
     }
 
-    // Join a specific cooperative game by its instance ID (like a private room/lobby)
     public joinCooperativeGame(playerId: string, gameInstanceId: string): ContextoDefaultGame {
-        // Check if player is already in a cooperative game
-        const currentGame = this.getCurrentPlayerGame(playerId)
-        if (currentGame && currentGame instanceof ContextoDefaultGame) {
-            if (currentGame.id === gameInstanceId) {
-                return currentGame // Already in this game
-            }
-            throw new Error("You are already in another cooperative game. Use /leave first.")
+        const game = this.joinGame(playerId, gameInstanceId)
+        if (!(game instanceof ContextoDefaultGame)) {
+            throw new Error(`Game ${gameInstanceId} is not a cooperative game`)
         }
-
-        // Find the specific cooperative game by its instance ID
-        const game = this.games.get(gameInstanceId)
-        if (!game || !(game instanceof ContextoDefaultGame)) {
-            throw new Error(`Cooperative game with ID ${gameInstanceId} not found`)
-        }
-
-        // Check if game has room for more players (cooperative games can have more players)
-        if (game.getPlayerCount() >= 20) {
-            throw new Error("This cooperative game is full (max 20 players)")
-        }
-
-        // Check if game is already finished
-        if (game.finished) {
-            throw new Error("This cooperative game has already been completed")
-        }
-
-        // Add player to the game
-        game.addPlayer(playerId)
-        this.playerGames.set(playerId, game.id)
         return game
     }
 
-    // Join a specific stop game by its instance ID (like a private room/lobby)
     public joinStopGame(playerId: string, gameInstanceId: string): ContextoStopGame {
-        // Check if player is already in a stop game
-        const currentGame = this.getCurrentPlayerGame(playerId)
-        if (currentGame && currentGame instanceof ContextoStopGame) {
-            if (currentGame.id === gameInstanceId) {
-                return currentGame // Already in this game
-            }
-            throw new Error("You are already in another stop game. Use /leave first.")
+        const game = this.joinGame(playerId, gameInstanceId)
+        if (!(game instanceof ContextoStopGame)) {
+            throw new Error(`Game ${gameInstanceId} is not a stop game`)
         }
-
-        // Find the specific stop game by its instance ID
-        const game = this.games.get(gameInstanceId)
-        if (!game || !(game instanceof ContextoStopGame)) {
-            throw new Error(`Stop game with ID ${gameInstanceId} not found`)
-        }
-
-        // Check if game has room for more players (stop games can have more players)
-        if (game.getPlayerCount() >= 20) {
-            throw new Error("This stop game is full (max 20 players)")
-        }
-
-        // Check if game is already finished
-        if (game.finished) {
-            throw new Error("This stop game has already been completed")
-        }
-
-        // Add player to the game
-        game.addPlayer(playerId)
-        this.playerGames.set(playerId, game.id)
         return game
     }
 
-    // Join a specific battle royale game by its instance ID (like a private room/lobby)
     public joinBattleRoyaleGame(playerId: string, gameInstanceId: string): ContextoBattleRoyaleGame {
-        // Check if player is already in a battle royale game
-        const currentGame = this.getCurrentPlayerGame(playerId)
-        if (currentGame && currentGame instanceof ContextoBattleRoyaleGame) {
-            if (currentGame.id === gameInstanceId) {
-                return currentGame // Already in this game
-            }
-            throw new Error("You are already in another battle royale game. Use /leave first.")
+        const game = this.joinGame(playerId, gameInstanceId)
+        if (!(game instanceof ContextoBattleRoyaleGame)) {
+            throw new Error(`Game ${gameInstanceId} is not a battle royale game`)
         }
-
-        // Find the specific battle royale game by its instance ID
-        const game = this.games.get(gameInstanceId)
-        if (!game || !(game instanceof ContextoBattleRoyaleGame)) {
-            throw new Error(`Battle Royale game with ID ${gameInstanceId} not found`)
-        }
-
-        // Check if game has room for more players (battle royale games can have more players)
-        if (game.getPlayerCount() >= 20) {
-            throw new Error("This battle royale game is full (max 20 players)")
-        }
-
-        // Check if game is already finished
-        if (game.finished) {
-            throw new Error("This battle royale game has already been completed")
-        }
-
-        // Add player to the game
-        game.addPlayer(playerId)
-        this.playerGames.set(playerId, game.id)
         return game
     }
 
