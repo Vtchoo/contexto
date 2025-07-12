@@ -68,7 +68,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Game has already finished' })
       }
 
-      gameManager.addUserToGame(token, roomId)
+      gameManager.joinGame(token, roomId)
 
       // Update user's current room
       const payload = JWTService.verifyToken(token)

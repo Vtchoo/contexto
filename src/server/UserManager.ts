@@ -43,7 +43,7 @@ export class UserManager {
 
   // Room management methods
   joinUserToRoom(userId: string, roomId: string): void {
-    this.gameManager.addUserToGame(userId, roomId)
+    this.gameManager.joinGame(userId, roomId)
   }
 
   removeUserFromRoom(userId: string): void {

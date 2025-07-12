@@ -104,7 +104,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         socket.join(roomId)
 
         // Add user to game
-        gameManager.addUserToGame(socketUser.userId, roomId)
+        gameManager.joinGame(socketUser.userId, roomId)
 
         // Update user's current room
         if (user) {

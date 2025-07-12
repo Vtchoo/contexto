@@ -39,15 +39,6 @@ export class GameManager {
     return true
   }
 
-  addUserToGame(userId: string, roomId: string): void {
-    const gameInfo = this.contextoManager.getGameInfo(roomId)
-    if (!gameInfo.exists || !gameInfo.game) {
-      throw new Error('Game not found')
-    }
-    
-    this.contextoManager.joinGame(userId, roomId)
-  }
-
   joinGame(userId: string, roomId: string): Game {
     return this.contextoManager.joinGame(userId, roomId)
   }
