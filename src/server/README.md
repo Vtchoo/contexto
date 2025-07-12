@@ -59,15 +59,13 @@ The server will be available at `http://localhost:3001`
 ## WebSocket Events
 
 ### Client → Server
-- `auth` - Authenticate with user token
 - `join_room` - Join a game room
 - `leave_room` - Leave current room
 - `make_guess` - Make a word guess
+- `start_game` - Start a game (host only)
 - `get_closest` - Get closest guesses
 
 ### Server → Client
-- `auth_success` - Authentication successful
-- `auth_error` - Authentication failed
 - `room_joined` - Successfully joined room
 - `room_left` - Left room
 - `player_joined` - Another player joined
@@ -75,6 +73,7 @@ The server will be available at `http://localhost:3001`
 - `guess_result` - Result of your guess
 - `player_guess` - Another player's guess (spoilered)
 - `game_finished` - Game completed
+- `game_started` - Game started by host
 - `closest_guesses` - List of closest guesses
 - `error` - Error message
 
@@ -121,10 +120,10 @@ curl -X POST http://localhost:3001/api/game/guess/3RFJ22A \\
 ```javascript
 import io from 'socket.io-client'
 
-const socket = io('http://localhost:3001')
-
-// Authenticate
-socket.emit('auth', { token: 'your-user-token' })
+// Connect with credentials (cookies) for automatic authentication
+const socket = io('http://localhost:3001', {
+  withCredentials: true
+})
 
 // Join a room
 socket.emit('join_room', { roomId: '3RFJ22A' })

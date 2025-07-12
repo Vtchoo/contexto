@@ -8,7 +8,6 @@ interface SocketUser {
   token: string
   userId: string
   username?: string
-  currentRoom?: string
 }
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
@@ -18,11 +17,13 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
     let socketUser: SocketUser | null = null
 
+    // Authenticate automatically on connection using cookies
     const cookies = socket.handshake.headers.cookie
     console.log('Socket auth cookies:', cookies)
 
     if (!cookies) {
-      socket.emit('auth_error', { error: 'No authentication cookies found' })
+      console.error('No authentication cookies found')
+      socket.disconnect()
       return
     }
 
@@ -37,8 +38,8 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
     const userToken = cookieObj.contexto_token
     if (!userToken) {
-      socket.disconnect()
       console.error('No authentication token found in cookies')
+      socket.disconnect()
       return
     }
 
@@ -47,65 +48,20 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Only validate existing user, never create new ones
     const user = userManager.getUserByToken(userToken)
     if (!user) {
-      socket.disconnect()
       console.error('Invalid or expired authentication token')
+      socket.disconnect()
       return
     }
 
-    // Authentication handler - only validates existing tokens
-    socket.on('auth', () => {
-      try {
-        // Get token from cookies only
-        const cookies = socket.handshake.headers.cookie
-        console.log('Socket auth cookies:', cookies)
+    console.log('Found user by token:', user.id)
 
-        if (!cookies) {
-          socket.emit('auth_error', { error: 'No authentication cookies found' })
-          return
-        }
+    socketUser = {
+      token: userToken,
+      userId: user.id,
+      username: user.username || undefined
+    }
 
-        // Parse cookies to find contexto_token
-        const cookieObj = cookies.split(';').reduce((acc: Record<string, string>, cookie) => {
-          const [key, value] = cookie.trim().split('=')
-          acc[key] = value
-          return acc
-        }, {})
-
-        console.log('Parsed cookies:', cookieObj)
-
-        const userToken = cookieObj.contexto_token
-        if (!userToken) {
-          socket.emit('auth_error', { error: 'No authentication token found in cookies' })
-          return
-        }
-
-        console.log('Using token from cookie:', userToken)
-
-        // Only validate existing user, never create new ones
-        const user = userManager.getUserByToken(userToken)
-        if (!user) {
-          socket.emit('auth_error', { error: 'Invalid or expired authentication token' })
-          return
-        }
-
-        console.log('Found user by token:', user.id)
-
-        socketUser = {
-          token: userToken,
-          userId: user.id,
-          username: user.username || undefined
-        }
-
-        socket.emit('auth_success', {
-          user: user.toJSON()
-        })
-
-        console.log(`✅ User authenticated via socket: ${user.id}`)
-      } catch (error: any) {
-        console.error('Socket auth error:', error)
-        socket.emit('auth_error', { error: error.message })
-      }
-    })
+    console.log(`✅ User authenticated via socket: ${user.id}`)
 
     // Join room handler
     socket.on('join_room', (data: { roomId: string }) => {
@@ -129,19 +85,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         // Leave current room if any
-        if (socketUser.currentRoom) {
-          socket.leave(socketUser.currentRoom)
+        const user = userManager.getUserByToken(socketUser.token)
+        if (user && user.currentRoom) {
+          socket.leave(user.currentRoom)
         }
 
         // Join new room
         socket.join(roomId)
-        socketUser.currentRoom = roomId
 
         // Add user to game
         gameManager.addUserToGame(socketUser.userId, roomId)
 
         // Update user's current room
-        const user = userManager.getUserByToken(socketUser.token)
         if (user) {
           user.joinRoom(roomId)
         }
@@ -169,20 +124,22 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Leave room handler
     socket.on('leave_room', () => {
       try {
-        if (!socketUser || !socketUser.currentRoom) {
+        if (!socketUser) {
           return
         }
 
-        const roomId = socketUser.currentRoom
+        const user = userManager.getUserByToken(socketUser.token)
+        if (!user || !user.currentRoom) {
+          return
+        }
+
+        const roomId = user.currentRoom
 
         // Remove user from game
         gameManager.removeUserFromGame(socketUser.userId, roomId)
 
         // Update user's current room
-        const user = userManager.getUserByToken(socketUser.token)
-        if (user) {
-          user.leaveRoom()
-        }
+        user.leaveRoom()
 
         // Leave socket room
         socket.leave(roomId)
@@ -192,8 +149,6 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           userId: socketUser.userId,
           username: socketUser.username
         })
-
-        socketUser.currentRoom = undefined
 
         socket.emit('room_left', { roomId })
 
@@ -206,13 +161,21 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Make guess handler
     socket.on('make_guess', async (data: { word: string }) => {
       try {
-        if (!socketUser || !socketUser.currentRoom) {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const user = userManager.getUserByToken(socketUser.token)
+        if (!user || !user.currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
           return
         }
 
+        console.log(`🔍 User ${socketUser.userId} making guess in room ${user.currentRoom}:`, data.word)
+
         const { word } = data
-        const roomId = socketUser.currentRoom
+        const roomId = user.currentRoom
 
         if (!word || typeof word !== 'string') {
           socket.emit('error', { error: 'Word is required' })
@@ -281,12 +244,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Start game handler
     socket.on('start_game', () => {
       try {
-        if (!socketUser || !socketUser.currentRoom) {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const user = userManager.getUserByToken(socketUser.token)
+        if (!user || !user.currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
           return
         }
 
-        const roomId = socketUser.currentRoom
+        const roomId = user.currentRoom
         const game = gameManager.getGame(roomId)
         if (!game) {
           socket.emit('error', { error: 'Game not found' })
@@ -319,13 +288,19 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Get closest guesses handler
     socket.on('get_closest', (data: { count?: number }) => {
       try {
-        if (!socketUser || !socketUser.currentRoom) {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const user = userManager.getUserByToken(socketUser.token)
+        if (!user || !user.currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
           return
         }
 
         const { count = 10 } = data
-        const roomId = socketUser.currentRoom
+        const roomId = user.currentRoom
 
         const game = gameManager.getGame(roomId)
         if (!game) {
@@ -348,12 +323,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     socket.on('disconnect', () => {
       console.log(`🔌 User disconnected: ${socket.id}`)
 
-      if (socketUser && socketUser.currentRoom) {
-        // Notify room about player leaving
-        socket.to(socketUser.currentRoom).emit('player_left', {
-          userId: socketUser.userId,
-          username: socketUser.username
-        })
+      if (socketUser) {
+        const user = userManager.getUserByToken(socketUser.token)
+        if (user && user.currentRoom) {
+          // Notify room about player leaving
+          socket.to(user.currentRoom).emit('player_left', {
+            userId: socketUser.userId,
+            username: socketUser.username
+          })
+
+          // Remove user from game
+          gameManager.removeUserFromGame(socketUser.userId, user.currentRoom)
+        }
       }
     })
 

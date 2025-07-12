@@ -69,25 +69,12 @@ function useGameHook() {
     newSocket.on('connect', () => {
       console.log('Socket connected')
       setIsConnected(true)
-      
-      // Authenticate using cookies only
-      // newSocket.emit('auth')
     })
 
     newSocket.on('disconnect', (reason) => {
       setIsConnected(false)
       console.log('Socket disconnected', reason)
     })
-
-    // newSocket.on('auth_success', (data) => {
-    //   console.log('Socket authentication successful for user:', data.user.id)
-    //   // User data should be the same as from HTTP API
-    // })
-
-    // newSocket.on('auth_error', (data) => {
-    //   console.error('Socket authentication failed:', data.error)
-    //   setError('Falha na autenticação do socket')
-    // })
 
     newSocket.on('room_joined', (data) => {
       console.log('Room joined event:', data) // Debug log
