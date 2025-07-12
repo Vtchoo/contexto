@@ -18,6 +18,14 @@ export default defineConfig({
   },
   server: {
     port: 3002,
+    host: true, // Enable host binding for better Windows/WSL support
+    watch: {
+      usePolling: true, // Enable polling for file changes (helps on Windows)
+      // interval: 1000, // Check for changes every 1 second
+    },
+    hmr: {
+      overlay: true, // Show error overlay on HMR failures
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
