@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js"
+import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
 import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
 
@@ -30,7 +30,7 @@ class RoomCommand implements ICommand {
         }
     }
 
-    private async findGame(roomId: string | null, playerId: string, interaction: any) {
+    private async findGame(roomId: string | null, playerId: string, interaction: ChatInputCommandInteraction<'cached'>) {
         if (roomId) {
             // Try to find game by ID
             return this.findGameById(roomId, interaction)
@@ -40,7 +40,7 @@ class RoomCommand implements ICommand {
         }
     }
 
-    private async findGameById(roomId: string, interaction: any) {
+    private async findGameById(roomId: string, interaction: ChatInputCommandInteraction<'cached'>) {
         // Check each game type in order
         const gameGetters = [
             () => gameManager.getCompetitiveGameInfo(roomId),
@@ -63,7 +63,7 @@ class RoomCommand implements ICommand {
         return null
     }
 
-    private async findPlayerCurrentGame(playerId: string, interaction: any) {
+    private async findPlayerCurrentGame(playerId: string, interaction: ChatInputCommandInteraction<'cached'>) {
         const currentGame = gameManager.getCurrentPlayerGame(playerId)
         if (!currentGame) {
             await interaction.reply({
@@ -75,7 +75,7 @@ class RoomCommand implements ICommand {
         return currentGame
     }
 
-    private async showRoomInfo(interaction: any, game: ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | ContextoBattleRoyaleGame, roomId: string | null) {
+    private async showRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | ContextoBattleRoyaleGame, roomId: string | null) {
         const roomIdOrUndefined = roomId || undefined
         
         if (game instanceof ContextoCompetitiveGame) {
@@ -89,12 +89,12 @@ class RoomCommand implements ICommand {
         }
     }
 
-    private async showCompetitiveRoomInfo(interaction: any, game: ContextoCompetitiveGame, roomId?: string) {
+    private async showCompetitiveRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoCompetitiveGame, roomId?: string) {
         const leaderboard = game.getLeaderboard()
         const activeStats = game.getActivePlayerStats()
         
         const sections = [
-            this.buildBasicInfo("� **Sala Competitiva**", game, `${game.getPlayerCount()}/10`),
+            this.buildBasicInfo("🏆 **Sala Competitiva**", game, `${game.getPlayerCount()}/10`),
             this.buildFeatureInfo(game),
             this.buildLeaderboardSection(leaderboard),
             this.buildActivePlayersSection(activeStats),
@@ -104,7 +104,7 @@ class RoomCommand implements ICommand {
         await this.sendResponse(interaction, sections, roomId)
     }
 
-    private async showCooperativeRoomInfo(interaction: any, game: ContextoDefaultGame, roomId?: string) {
+    private async showCooperativeRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoDefaultGame, roomId?: string) {
         const closestGuesses = game.getClosestGuesses('any', 5)
         const statusText = game.finished ? '✅ Finalizado' : '🎮 Em andamento'
         
@@ -120,7 +120,7 @@ class RoomCommand implements ICommand {
         await this.sendResponse(interaction, sections, roomId)
     }
 
-    private async showStopRoomInfo(interaction: any, game: ContextoStopGame, roomId?: string) {
+    private async showStopRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoStopGame, roomId?: string) {
         const progress = game.getAllPlayersProgress()
         const statusText = this.buildStopStatusText(game)
         
@@ -137,7 +137,7 @@ class RoomCommand implements ICommand {
         await this.sendResponse(interaction, sections, roomId)
     }
 
-    private async showBattleRoyaleRoomInfo(interaction: any, game: ContextoBattleRoyaleGame, roomId?: string) {
+    private async showBattleRoyaleRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoBattleRoyaleGame, roomId?: string) {
         const progress = game.getAllPlayersProgress()
         const statusEmoji = game.finished ? '🏁' : game.started ? '🟢' : '🔴'
         const statusText = game.finished ? 'Finalizado' : game.started ? 'Em andamento' : 'Aguardando início'
@@ -257,7 +257,7 @@ class RoomCommand implements ICommand {
         return ""
     }
 
-    private async sendResponse(interaction: any, sections: string[], roomId: string | null | undefined, forceEphemeral = false): Promise<void> {
+    private async sendResponse(interaction: ChatInputCommandInteraction<'cached'>, sections: string[], roomId: string | null | undefined, forceEphemeral = false): Promise<void> {
         const content = sections.filter(section => section.length > 0).join('\n\n')
         const ephemeral = forceEphemeral || (roomId != null)
         
