@@ -21,7 +21,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       try {
         let userToken = data.token
 
-        if (!userToken || !userManager.getUser(userToken)) {
+        if (!userToken || !userManager.getUserByToken(userToken)) {
           // Generate new user token
           userToken = snowflakeGenerator.generate()
           userManager.createUser(userToken)
@@ -29,12 +29,12 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         socketUser = {
           token: userToken,
-          username: userManager.getUser(userToken)?.username || undefined
+          username: userManager.getUserByToken(userToken)?.username || undefined
         }
 
         socket.emit('auth_success', {
           token: userToken,
-          user: userManager.getUser(userToken)?.toJSON()
+          user: userManager.getUserByToken(userToken)?.toJSON()
         })
 
         console.log(`✅ User authenticated: ${userToken}`)
@@ -77,7 +77,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         gameManager.addUserToGame(socketUser.token, roomId)
 
         // Update user's current room
-        const user = userManager.getUser(socketUser.token)
+        const user = userManager.getUserByToken(socketUser.token)
         if (user) {
           user.joinRoom(roomId)
         }
@@ -113,7 +113,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         gameManager.removeUserFromGame(socketUser.token, roomId)
 
         // Update user's current room
-        const user = userManager.getUser(socketUser.token)
+        const user = userManager.getUserByToken(socketUser.token)
         if (user) {
           user.leaveRoom()
         }
@@ -188,7 +188,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // If game finished, update user stats
         if (game.finished && guess.distance === 0) {
-          const user = userManager.getUser(socketUser.token)
+          const user = userManager.getUserByToken(socketUser.token)
           if (user) {
             user.incrementGamesPlayed()
             user.incrementGamesWon()

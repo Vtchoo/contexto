@@ -18,7 +18,7 @@ export class GameManager {
   }
 
   createGame(type: 'default' | 'competitive' | 'battle-royale' | 'stop', userId: string, word?: string | number | Date): string {
-    const roomId = snowflakeGenerator.generate()
+    // const roomId = snowflakeGenerator.generate()
     let game: Game
 
     switch (type) {
@@ -36,12 +36,12 @@ export class GameManager {
         break
     }
 
-    // Replace the auto-generated ID with our custom room ID
-    Object.defineProperty(game, 'id', { value: roomId, writable: false })
+    // // Replace the auto-generated ID with our custom room ID
+    // Object.defineProperty(game, 'id', { value: roomId, writable: false })
 
-    this.games.set(roomId, game)
-    this.addUserToGame(userId, roomId)
-    return roomId
+    this.games.set(game.id, game)
+    this.addUserToGame(userId, game.id)
+    return game.id
   }
 
   getGame(roomId: string): Game | null {

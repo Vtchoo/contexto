@@ -22,7 +22,7 @@ export function setupUserRoutes(userManager: UserManager) {
   router.post('/username', async (req: Request, res: Response) => {
     try {
       const { username } = req.body
-      const userId = req.userToken!
+      const token = req.userToken!
 
       if (!username || typeof username !== 'string') {
         return res.status(400).json({ error: 'Username is required' })
@@ -36,12 +36,12 @@ export function setupUserRoutes(userManager: UserManager) {
         return res.status(400).json({ error: 'Username can only contain letters, numbers, underscores, and hyphens' })
       }
 
-      const success = userManager.setUsername(userId, username)
+      const success = userManager.setUsername(token, username)
       if (!success) {
         return res.status(400).json({ error: 'Username is already taken' })
       }
 
-      const user = userManager.getUser(userId)
+      const user = userManager.getUserByToken(token)
       res.json({
         message: 'Username set successfully',
         user: user!.toJSON()
@@ -54,17 +54,17 @@ export function setupUserRoutes(userManager: UserManager) {
   // Generate anonymous username
   router.post('/username/anonymous', async (req: Request, res: Response) => {
     try {
-      const userId = req.userToken!
+      const token = req.userToken!
       const anonymousUsername = userManager.generateAnonymousUsername()
 
-      const success = userManager.setUsername(userId, anonymousUsername)
+      const success = userManager.setUsername(token, anonymousUsername)
       if (!success) {
         // Try again with a different username
         const fallbackUsername = `Player${Date.now()}`
-        userManager.setUsername(userId, fallbackUsername)
+        userManager.setUsername(token, fallbackUsername)
       }
 
-      const user = userManager.getUser(userId)
+      const user = userManager.getUserByToken(token)
       res.json({
         message: 'Anonymous username generated successfully',
         user: user!.toJSON()

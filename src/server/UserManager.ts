@@ -1,17 +1,22 @@
 import { User } from './User'
 import snowflakeGenerator from '../utils/snowflake'
+import JWTService from '../utils/jwt'
 
 export class UserManager {
-  private users = new Map<string, User>()
+  private users = new Map<string, User>() // Maps user ID to User
   private usersByUsername = new Map<string, User>()
 
-  createUser(token: string, username?: string): User {
-    if (this.users.has(token)) {
-      return this.users.get(token)!
-    }
+  createUser(token?: string, username?: string): User {
+    // Generate a unique user ID
+    const userId = snowflakeGenerator.generate()
+    
+    // Generate JWT token with user ID
+    const jwtToken = token || JWTService.generateToken(userId)
 
-    const user = new User(token, username)
-    this.users.set(token, user)
+    const user = new User(userId, jwtToken, username)
+    
+    // Store user by ID only
+    this.users.set(userId, user)
     
     if (username) {
       this.usersByUsername.set(username, user)
@@ -20,16 +25,31 @@ export class UserManager {
     return user
   }
 
-  getUser(token: string): User | null {
-    return this.users.get(token) || null
+  getUserByToken(token: string): User | null {
+    // Parse token to get user ID
+    const payload = JWTService.verifyToken(token)
+    if (!payload) {
+      return null
+    }
+
+    return this.getUserById(payload.userId)
+  }
+
+  getUserById(userId: string): User | null {
+    return this.users.get(userId) || null
   }
 
   getUserByUsername(username: string): User | null {
     return this.usersByUsername.get(username) || null
   }
 
-  setUsername(token: string, username: string): boolean {
-    const user = this.users.get(token)
+  setUsername(tokenOrId: string, username: string): boolean {
+    // Try to get user by ID first, then by token
+    let user = this.getUserById(tokenOrId)
+    if (!user) {
+      user = this.getUserByToken(tokenOrId)
+    }
+    
     if (!user) return false
 
     // Check if username is already taken
@@ -61,8 +81,13 @@ export class UserManager {
     return Array.from(this.users.values()).filter(user => user.isActive()).length
   }
 
-  updateUserActivity(token: string): void {
-    const user = this.users.get(token)
+  updateUserActivity(tokenOrId: string): void {
+    // Try to get user by ID first, then by token
+    let user = this.getUserById(tokenOrId)
+    if (!user) {
+      user = this.getUserByToken(tokenOrId)
+    }
+    
     if (user) {
       user.updateActivity()
     }
@@ -73,17 +98,41 @@ export class UserManager {
     const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
     let removedCount = 0
 
-    for (const [token, user] of this.users) {
+    for (const [userId, user] of this.users) {
       if (user.lastActivity < sevenDaysAgo) {
         if (user.username) {
           this.usersByUsername.delete(user.username)
         }
-        this.users.delete(token)
+        this.users.delete(userId)
         removedCount++
       }
     }
 
     return removedCount
+  }
+
+  // Verify and refresh JWT tokens
+  verifyAndRefreshToken(token: string): { user: User | null; newToken?: string } {
+    const payload = JWTService.verifyToken(token)
+    if (!payload) {
+      return { user: null }
+    }
+
+    const user = this.getUserById(payload.userId)
+    if (!user) {
+      return { user: null }
+    }
+
+    // Check if token needs refresh
+    const newToken = JWTService.refreshTokenIfNeeded(token)
+    if (newToken && newToken !== token) {
+      // Update user's token
+      user.token = newToken
+      
+      return { user, newToken }
+    }
+
+    return { user }
   }
 
   // Generate anonymous username

@@ -8,6 +8,7 @@ import helmet from 'helmet'
 import compression from 'compression'
 import createConnection from '../database'
 import snowflakeGenerator from '../utils/snowflake'
+import JWTService from '../utils/jwt'
 import { GameManager } from './GameManager'
 import { UserManager } from './UserManager'
 import { setupGameRoutes } from './routes/gameRoutes'
@@ -38,28 +39,46 @@ app.use(cookieParser())
 const gameManager = new GameManager()
 const userManager = new UserManager()
 
-// Token middleware - generate user token on first visit
+// JWT Token middleware - authenticate users with JWT tokens
 app.use((req, res, next) => {
 	let userToken = req.cookies.contexto_token
+	let user: any = null
+	let newToken: string | undefined = undefined
 
-	if (!userToken) {
-		// Generate new user token using snowflake
-		userToken = snowflakeGenerator.generate()
+	if (userToken) {
+		// Verify existing token
+		const result = userManager.verifyAndRefreshToken(userToken)
+		user = result.user
+		newToken = result.newToken
 
-		// Set cookie with 30 days expiration
+		if (newToken) {
+			// Update cookie with refreshed token
+			res.cookie('contexto_token', newToken, {
+				maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+				httpOnly: true,
+				secure: process.env.NODE_ENV === 'production',
+				sameSite: 'lax'
+			})
+			userToken = newToken
+		}
+	}
+
+	if (!user) {
+		// Create new user with JWT token
+		user = userManager.createUser()
+		userToken = user.token
+
+		// Set cookie with JWT token
 		res.cookie('contexto_token', userToken, {
 			maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
 			sameSite: 'lax'
 		})
-
-		// Create user in memory
-		userManager.createUser(userToken)
 	}
 
 	// Attach user to request
-	req.user = userManager.getUser(userToken)
+	req.user = user
 	req.userToken = userToken
 
 	next()

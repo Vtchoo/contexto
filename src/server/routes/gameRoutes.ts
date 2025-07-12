@@ -20,17 +20,17 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
   router.post('/create', async (req: Request, res: Response) => {
     try {
       const { type, gameId } = req.body
-      const userId = req.userToken!
+      const token = req.userToken!
 
       if (!['default', 'competitive', 'battle-royale', 'stop'].includes(type)) {
         return res.status(400).json({ error: 'Invalid game type' })
       }
 
-      const roomId = gameManager.createGame(type, userId, gameId)
+      const roomId = gameManager.createGame(type, token, gameId)
       const game = gameManager.getGame(roomId)
 
       // Update user's current room
-      const user = userManager.getUser(userId)
+      const user = userManager.getUserByToken(token)
       if (user) {
         user.joinRoom(roomId)
       }
@@ -50,7 +50,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
   router.post('/join/:roomId', async (req: Request, res: Response) => {
     try {
       const { roomId } = req.params
-      const userId = req.userToken!
+      const token = req.userToken!
 
       if (!snowflakeGenerator.isValid(roomId)) {
         return res.status(400).json({ error: 'Invalid room ID' })
@@ -65,10 +65,10 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Game has already finished' })
       }
 
-      gameManager.addUserToGame(userId, roomId)
+      gameManager.addUserToGame(token, roomId)
 
       // Update user's current room
-      const user = userManager.getUser(userId)
+      const user = userManager.getUserByToken(token)
       if (user) {
         user.joinRoom(roomId)
       }
@@ -88,7 +88,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
     try {
       const { roomId } = req.params
       const { word } = req.body
-      const userId = req.userToken!
+      const token = req.userToken!
 
       if (!snowflakeGenerator.isValid(roomId)) {
         return res.status(400).json({ error: 'Invalid room ID' })
@@ -107,14 +107,14 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Game has already finished' })
       }
 
-      const guess = await game.tryWord(userId, word.trim().toLowerCase())
+      const guess = await game.tryWord(token, word.trim().toLowerCase())
 
       // Update user activity
-      userManager.updateUserActivity(userId)
+      userManager.updateUserActivity(token)
 
       // If game finished, update user stats
       if (game.finished && guess.distance === 0) {
-        const user = userManager.getUser(userId)
+        const user = userManager.getUserByToken(token)
         if (user) {
           user.incrementGamesPlayed()
           user.incrementGamesWon()
@@ -163,16 +163,16 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
   router.post('/leave/:roomId', async (req: Request, res: Response) => {
     try {
       const { roomId } = req.params
-      const userId = req.userToken!
+      const token = req.userToken!
 
       if (!snowflakeGenerator.isValid(roomId)) {
         return res.status(400).json({ error: 'Invalid room ID' })
       }
 
-      gameManager.removeUserFromGame(userId, roomId)
+      gameManager.removeUserFromGame(token, roomId)
 
       // Update user's current room
-      const user = userManager.getUser(userId)
+      const user = userManager.getUserByToken(token)
       if (user) {
         user.leaveRoom()
       }

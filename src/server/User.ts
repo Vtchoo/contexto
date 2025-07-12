@@ -1,4 +1,5 @@
 export class User {
+  public id: string
   public token: string
   public username: string | null
   public lastActivity: number
@@ -7,7 +8,8 @@ export class User {
   public averageGuesses: number
   public currentRoom: string | null
 
-  constructor(token: string, username?: string) {
+  constructor(id: string, token: string, username?: string) {
+    this.id = id
     this.token = token
     this.username = username || null
     this.lastActivity = Date.now()
@@ -68,6 +70,7 @@ export class User {
 
   getStats() {
     return {
+      id: this.id,
       token: this.token,
       username: this.username,
       gamesPlayed: this.gamesPlayed,
@@ -82,6 +85,7 @@ export class User {
 
   toJSON() {
     return {
+      id: this.id,
       token: this.token,
       username: this.username,
       gamesPlayed: this.gamesPlayed,
