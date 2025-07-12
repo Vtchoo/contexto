@@ -26,11 +26,11 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Invalid game type' })
       }
 
-      const roomId = gameManager.createGame(type, token, gameId)
+      const roomId = gameManager.createGame(type, req.user.id, gameId)
       const game = gameManager.getGame(roomId)
 
       // Update user's current room
-      const user = userManager.getUserByToken(token)
+      const user = userManager.getUserById(req.user.id)
       if (user) {
         user.joinRoom(roomId)
       }

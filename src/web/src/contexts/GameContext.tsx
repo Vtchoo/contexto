@@ -31,9 +31,8 @@ function useGameHook() {
     newSocket.on('connect', () => {
       setIsConnected(true)
 
-      // Try to authenticate with existing token
-      const token = localStorage.getItem('contexto-token')
-      newSocket.emit('auth', { token })
+      // Authenticate using cookies (no need to send token manually)
+      newSocket.emit('auth', {})
     })
 
     newSocket.on('disconnect', () => {
@@ -42,7 +41,7 @@ function useGameHook() {
 
     newSocket.on('auth_success', (data) => {
       setUser(data.user)
-      localStorage.setItem('contexto-token', data.token)
+      // Token is now handled via cookies, no need for localStorage
     })
 
     newSocket.on('room_joined', (data) => {
@@ -166,6 +165,12 @@ function useGameHook() {
       console.log('Creating game with initial state:', initialGame) // Debug log
       setCurrentGame(initialGame)
 
+      // Join the room via socket to ensure the socket connection knows about it
+      if (socket && isConnected) {
+        console.log('Joining room via socket:', response.roomId) // Debug log
+        socket.emit('join_room', { roomId: response.roomId })
+      }
+
       return response.roomId.toString()
     } catch (err) {
       setError('Falha ao criar jogo')
@@ -229,11 +234,18 @@ function useGameHook() {
   }
 
   const startGame = () => {
+    console.log('startGame called') // Debug log
+    console.log('currentGame:', currentGame) // Debug log
+    console.log('socket connected:', socket?.connected) // Debug log
+    console.log('isConnected:', isConnected) // Debug log
+    
     if (!currentGame?.roomId || !socket || !isConnected) {
+      console.log('startGame failed - missing requirements') // Debug log
       setError('Não é possível iniciar o jogo')
       return
     }
 
+    console.log('Emitting start_game event') // Debug log
     socket.emit('start_game')
   }
 

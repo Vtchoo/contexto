@@ -15,6 +15,7 @@ import { setupGameRoutes } from './routes/gameRoutes'
 import { setupRoomRoutes } from './routes/roomRoutes'
 import { setupUserRoutes } from './routes/userRoutes'
 import { setupSocketHandlers } from './socket/socketHandlers'
+import { User } from './User'
 
 const app = express()
 const server = createServer(app)
@@ -42,7 +43,7 @@ const userManager = new UserManager()
 // JWT Token middleware - authenticate users with JWT tokens
 app.use((req, res, next) => {
 	let userToken = req.cookies.contexto_token
-	let user: any = null
+	let user: User | null = null
 	let newToken: string | undefined = undefined
 
 	if (userToken) {

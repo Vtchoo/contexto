@@ -21,17 +21,37 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     // Authentication handler
     socket.on('auth', (data: { token?: string }) => {
       try {
-        let userToken = data.token
+        // Try to get token from cookies first, then fallback to data.token
+        const cookies = socket.handshake.headers.cookie
+        console.log(cookies)
+        let userToken: string | undefined = data.token
+        
+        if (cookies) {
+          // Parse cookies to find contexto_token
+          const cookieObj = cookies.split(';').reduce((acc: Record<string, string>, cookie) => {
+            const [key, value] = cookie.trim().split('=')
+            acc[key] = value
+            return acc
+          }, {})
+          
+          if (cookieObj.contexto_token) {
+            userToken = cookieObj.contexto_token
+            console.log('Using token from cookie:', userToken)
+          }
+        }
+        
         let user: User | null = null
 
         if (userToken) {
           // Try to get existing user by token
           user = userManager.getUserByToken(userToken)
+          console.log('Found user by token:', user?.id)
         }
 
         if (!user) {
           // Create new user (this will generate a new JWT token internally)
           user = userManager.createUser()
+          console.log(`New user created:`, user.id)
           userToken = user.token
         }
 
