@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { gameApi, User, Guess } from '../api/gameApi'
+import contextualize from '@/utils/contextualize'
 
 interface CurrentGame {
   roomId: string
@@ -10,30 +11,7 @@ interface CurrentGame {
   finished: boolean
 }
 
-interface GameContextType {
-  user: User | null
-  socket: Socket | null
-  currentGame: CurrentGame | null
-  isConnected: boolean
-  loading: boolean
-  error: string | null
-  connect: () => void
-  disconnect: () => void
-  createGame: (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number) => Promise<string>
-  quickPlay: (word: string) => Promise<void>
-  joinRoom: (roomId: string) => Promise<void>
-  leaveRoom: () => void
-  makeGuess: (word: string) => Promise<void>
-  clearError: () => void
-}
-
-const GameContext = createContext<GameContextType | undefined>(undefined)
-
-interface GameProviderProps {
-  children: ReactNode
-}
-
-export function GameProvider({ children }: GameProviderProps) {
+function useGameHook() {
   const [user, setUser] = useState<User | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
   const [currentGame, setCurrentGame] = useState<CurrentGame | null>(null)
@@ -50,7 +28,7 @@ export function GameProvider({ children }: GameProviderProps) {
 
     newSocket.on('connect', () => {
       setIsConnected(true)
-      
+
       // Try to authenticate with existing token
       const token = localStorage.getItem('contexto-token')
       newSocket.emit('auth', { token })
@@ -152,15 +130,15 @@ export function GameProvider({ children }: GameProviderProps) {
   const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number): Promise<string> => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const response = await gameApi.createGame(type, gameId)
-      
+
       // Join the game room via socket
       if (socket && isConnected) {
         socket.emit('join_room', { roomId: response.roomId })
       }
-      
+
       // Initialize the game state
       setCurrentGame({
         roomId: response.roomId.toString(),
@@ -169,7 +147,7 @@ export function GameProvider({ children }: GameProviderProps) {
         guesses: [],
         finished: false
       })
-      
+
       return response.roomId.toString()
     } catch (err) {
       setError('Falha ao criar jogo')
@@ -182,7 +160,7 @@ export function GameProvider({ children }: GameProviderProps) {
   const quickPlay = async (word: string): Promise<void> => {
     setLoading(true)
     setError(null)
-    
+
     try {
       // Create a default game
       await createGame('default')
@@ -212,10 +190,10 @@ export function GameProvider({ children }: GameProviderProps) {
 
   const makeGuess = async (word: string) => {
     if (!currentGame?.roomId || loading) return
-    
+
     setLoading(true)
     setError(null)
-    
+
     try {
       if (socket && isConnected) {
         // Use Socket.IO for real-time guess
@@ -242,34 +220,24 @@ export function GameProvider({ children }: GameProviderProps) {
     return () => disconnect()
   }, [])
 
-  return (
-    <GameContext.Provider
-      value={{
-        user,
-        socket,
-        currentGame,
-        isConnected,
-        loading,
-        error,
-        connect,
-        disconnect,
-        createGame,
-        quickPlay,
-        joinRoom,
-        leaveRoom,
-        makeGuess,
-        clearError,
-      }}
-    >
-      {children}
-    </GameContext.Provider>
-  )
+  return {
+    user,
+    socket,
+    currentGame,
+    isConnected,
+    loading,
+    error,
+    connect,
+    disconnect,
+    createGame,
+    quickPlay,
+    joinRoom,
+    leaveRoom,
+    makeGuess,
+    clearError,
+  }
 }
 
-export function useGame() {
-  const context = useContext(GameContext)
-  if (context === undefined) {
-    throw new Error('useGame must be used within a GameProvider')
-  }
-  return context
-}
+const [GameProvider, useGame] = contextualize(useGameHook)
+
+export { GameProvider, useGame }
