@@ -1,3 +1,4 @@
+import "./App.css"
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { GameProvider } from './contexts/GameContext'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -26,7 +27,7 @@ function App() {
       <GameProvider>
         <Router>
           <AppContainer>
-            <Header />
+            {/* <Header /> */}
             <MainContent>
               <Routes>
                 <Route path="/" element={<HomePage />} />
