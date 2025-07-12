@@ -93,12 +93,13 @@ export const strings = {
   errors: {
     connectionLost: 'Conexão perdida. Tentando reconectar...',
     invalidWord: 'Palavra inválida',
-    wordTooShort: 'Palavra muito curta',
+    wordTooShort: 'Palavra muito curta (mínimo 2 letras)',
     wordTooLong: 'Palavra muito longa',
     alreadyGuessed: 'Você já tentou esta palavra',
     gameNotFound: 'Jogo não encontrado',
     serverError: 'Erro do servidor. Tente novamente.',
-    networkError: 'Erro de rede. Verifique sua conexão.'
+    networkError: 'Erro de rede. Verifique sua conexão.',
+    authenticationFailed: 'Falha na autenticação. Recarregue a página.'
   },
   
   // Success messages

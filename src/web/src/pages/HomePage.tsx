@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
@@ -120,7 +120,7 @@ function HomePage() {
   const navigate = useNavigate()
   const [selectedMode, setSelectedMode] = useState<GameMode>('default')
   const [showDemo, setShowDemo] = useState(false)
-  const { createGame, guesses, loading, gameFinished, makeGuess, user, isConnected } = useGame()
+  const { createGame, guesses, loading, gameFinished, makeGuess, user, isConnected, currentRoom } = useGame()
 
   const handleStartGame = async () => {
     try {
@@ -163,7 +163,7 @@ function HomePage() {
       <Container>
         <DemoGame>
           <GameInterface
-            gameId={1027}
+            roomId={currentRoom || undefined}
             guesses={guesses}
             onGuess={handleDemoGuess}
             gameFinished={gameFinished}

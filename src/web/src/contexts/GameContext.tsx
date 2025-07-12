@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { gameApi, userApi, User, Guess } from '../api/gameApi'
 
@@ -73,6 +73,31 @@ export function GameProvider({ children }: GameProviderProps) {
       if (data.gameFinished !== undefined) setGameFinished(data.gameFinished)
     })
 
+    newSocket.on('guess_result', (data) => {
+      // Handle our own guess result
+      setGuesses(prev => [...prev, data.guess])
+      setGameFinished(data.gameFinished || false)
+      setLoading(false)
+    })
+
+    newSocket.on('player_guess', (data) => {
+      // Handle other players' guesses in multiplayer
+      setGuesses(prev => [...prev, {
+        word: data.word,
+        distance: data.distance,
+        addedBy: data.playerId,
+        error: data.error
+      }])
+    })
+
+    newSocket.on('game_finished', (data) => {
+      setGameFinished(true)
+      if (data.winner) {
+        // Handle game completion
+        console.log(`Game finished! Winner: ${data.winner}`)
+      }
+    })
+
     newSocket.on('error', (data) => {
       setError(data.message)
     })
@@ -98,13 +123,13 @@ export function GameProvider({ children }: GameProviderProps) {
       
       // Join the game room via socket
       if (socket && isConnected) {
-        socket.emit('join_game', { gameId: response.gameId })
+        socket.emit('join_room', { roomId: response.roomId })
       }
       
       setGuesses([])
       setGameFinished(false)
       
-      return response.gameId.toString()
+      return response.roomId.toString()
     } catch (err) {
       setError('Falha ao criar jogo')
       throw err
@@ -132,13 +157,18 @@ export function GameProvider({ children }: GameProviderProps) {
     setError(null)
     
     try {
-      await gameApi.makeGuess(currentRoom, word)
-      // The server will broadcast the update via socket
+      if (socket && isConnected) {
+        // Use Socket.IO for real-time guess
+        socket.emit('make_guess', { word })
+      } else {
+        // Fallback to HTTP API
+        await gameApi.makeGuess(currentRoom, word)
+        // The server will broadcast the update via socket
+      }
     } catch (err) {
       setError('Falha ao enviar tentativa')
-      throw err
-    } finally {
       setLoading(false)
+      throw err
     }
   }
 

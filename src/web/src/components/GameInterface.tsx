@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import styled from 'styled-components'
 import Row from './Row'
 import { strings } from '../constants/strings'
@@ -157,6 +157,17 @@ const WinMessage = styled.div`
   animation: fadeIn 0.5s ease-out;
 `
 
+const ErrorMessage = styled.div`
+  background: var(--red);
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  animation: fadeIn 0.5s ease-out;
+`
+
 const LoadingSpinner = styled.div`
   display: inline-block;
   width: 20px;
@@ -202,6 +213,12 @@ function GameInterface({
     if (!inputValue.trim() || loading || gameFinished) return
 
     const word = inputValue.trim().toLowerCase()
+    
+    // Basic validation
+    if (word.length < 2) {
+      return // Too short
+    }
+
     setLastGuess(word)
     onGuess(word)
     setInputValue('')
