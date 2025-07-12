@@ -109,39 +109,6 @@ class ContextoManager {
         return game
     }
 
-    // Convenience methods for backward compatibility (optional - can be removed if not needed)
-    public joinCompetitiveGame(playerId: string, gameInstanceId: string): ContextoCompetitiveGame {
-        const game = this.joinGame(playerId, gameInstanceId)
-        if (!(game instanceof ContextoCompetitiveGame)) {
-            throw new Error(`Game ${gameInstanceId} is not a competitive game`)
-        }
-        return game
-    }
-
-    public joinCooperativeGame(playerId: string, gameInstanceId: string): ContextoDefaultGame {
-        const game = this.joinGame(playerId, gameInstanceId)
-        if (!(game instanceof ContextoDefaultGame)) {
-            throw new Error(`Game ${gameInstanceId} is not a cooperative game`)
-        }
-        return game
-    }
-
-    public joinStopGame(playerId: string, gameInstanceId: string): ContextoStopGame {
-        const game = this.joinGame(playerId, gameInstanceId)
-        if (!(game instanceof ContextoStopGame)) {
-            throw new Error(`Game ${gameInstanceId} is not a stop game`)
-        }
-        return game
-    }
-
-    public joinBattleRoyaleGame(playerId: string, gameInstanceId: string): ContextoBattleRoyaleGame {
-        const game = this.joinGame(playerId, gameInstanceId)
-        if (!(game instanceof ContextoBattleRoyaleGame)) {
-            throw new Error(`Game ${gameInstanceId} is not a battle royale game`)
-        }
-        return game
-    }
-
     // Unified method to get any game by ID
     public getGameInfo(gameInstanceId: string): { game: ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame | null; exists: boolean } {
         const game = this.games.get(gameInstanceId)
