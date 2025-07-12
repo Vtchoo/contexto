@@ -34,7 +34,7 @@ export interface Guess {
 export interface GameRoom {
   roomId: string
   gameId: number
-  type: 'default' | 'competitive' | 'battle-royale'
+  type: 'default' | 'competitive' | 'battle-royale' | 'stop'
   finished: boolean
   guessCount: number
   createdAt: string
@@ -70,7 +70,7 @@ export interface RoomInfo {
 // API functions
 export const gameApi = {
   // Game management
-  createGame: async (type: 'default' | 'competitive' | 'battle-royale', gameId?: number): Promise<CreateGameResponse> => {
+  createGame: async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number): Promise<CreateGameResponse> => {
     const response = await api.post('/api/game/create', { type, gameId })
     return response.data
   },

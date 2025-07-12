@@ -1,10 +1,11 @@
 import { ContextoDefaultGame } from '../game/ContextoDefaultGame'
 import { ContextoCompetitiveGame } from '../game/ContextoCompetitiveGame'
 import { ContextoBattleRoyaleGame } from '../game/ContextoBattleRoyaleGame'
+import { ContextoStopGame } from '../game/ContextoStopGame'
 import { ContextoManager } from '../game/ContextoManager'
 import snowflakeGenerator from '../utils/snowflake'
 
-export type Game = ContextoDefaultGame | ContextoCompetitiveGame | ContextoBattleRoyaleGame
+export type Game = ContextoDefaultGame | ContextoCompetitiveGame | ContextoBattleRoyaleGame | ContextoStopGame
 
 export class GameManager {
   private games = new Map<string, Game>()
@@ -16,7 +17,7 @@ export class GameManager {
     this.contextoManager = new ContextoManager()
   }
 
-  createGame(type: 'default' | 'competitive' | 'battle-royale', userId: string, word?: string | number | Date): string {
+  createGame(type: 'default' | 'competitive' | 'battle-royale' | 'stop', userId: string, word?: string | number | Date): string {
     const roomId = snowflakeGenerator.generate()
     let game: Game
 
@@ -26,6 +27,9 @@ export class GameManager {
         break
       case 'battle-royale':
         game = new ContextoBattleRoyaleGame(userId, this.contextoManager, word)
+        break
+      case 'stop':
+        game = new ContextoStopGame(userId, this.contextoManager, word)
         break
       default:
         game = new ContextoDefaultGame(userId, this.contextoManager, word)
@@ -142,7 +146,8 @@ export class GameManager {
     const gameTypes = {
       default: 0,
       competitive: 0,
-      battleRoyale: 0
+      battleRoyale: 0,
+      stop: 0
     }
 
     for (const game of allGames) {
@@ -150,6 +155,8 @@ export class GameManager {
         gameTypes.battleRoyale++
       } else if (game instanceof ContextoCompetitiveGame) {
         gameTypes.competitive++
+      } else if (game instanceof ContextoStopGame) {
+        gameTypes.stop++
       } else {
         gameTypes.default++
       }

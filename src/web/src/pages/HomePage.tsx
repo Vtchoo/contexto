@@ -114,7 +114,7 @@ const DemoGame = styled.div`
   max-width: 600px;
 `
 
-type GameMode = 'default' | 'competitive' | 'battle-royale'
+type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
 
 function HomePage() {
   const navigate = useNavigate()
@@ -150,6 +150,11 @@ function HomePage() {
       key: 'battle-royale' as GameMode,
       name: strings.modes.battleRoyale,
       description: strings.modeDescriptions.battleRoyale
+    },
+    {
+      key: 'stop' as GameMode,
+      name: strings.modes.stop,
+      description: strings.modeDescriptions.stop
     }
   ]
 

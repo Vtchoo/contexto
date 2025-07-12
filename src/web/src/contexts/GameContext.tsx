@@ -13,7 +13,7 @@ interface GameContextType {
   gameFinished: boolean
   connect: () => void
   disconnect: () => void
-  createGame: (type: 'default' | 'competitive' | 'battle-royale', gameId?: number) => Promise<string>
+  createGame: (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number) => Promise<string>
   joinRoom: (roomId: string) => Promise<void>
   leaveRoom: () => void
   makeGuess: (word: string) => Promise<void>
@@ -89,7 +89,7 @@ export function GameProvider({ children }: GameProviderProps) {
     }
   }
 
-  const createGame = async (type: 'default' | 'competitive' | 'battle-royale', gameId?: number): Promise<string> => {
+  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number): Promise<string> => {
     setLoading(true)
     setError(null)
     

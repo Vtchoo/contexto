@@ -22,7 +22,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const { type, gameId } = req.body
       const userId = req.userToken!
 
-      if (!['default', 'competitive', 'battle-royale'].includes(type)) {
+      if (!['default', 'competitive', 'battle-royale', 'stop'].includes(type)) {
         return res.status(400).json({ error: 'Invalid game type' })
       }
 

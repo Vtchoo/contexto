@@ -16,13 +16,15 @@ export const strings = {
   modes: {
     classic: 'Clássico',
     cooperative: 'Cooperativo',
-    battleRoyale: 'Battle Royale'
+    battleRoyale: 'Battle Royale',
+    stop: 'Stop'
   },
   
   modeDescriptions: {
     classic: 'Descubra a palavra secreta usando pistas de contexto',
     cooperative: 'Trabalhe em equipe para encontrar a palavra',
-    battleRoyale: 'Compita contra outros jogadores em tempo real'
+    battleRoyale: 'Compita contra outros jogadores em tempo real',
+    stop: 'Corrida contra o tempo para encontrar a palavra'
   },
   
   // Game interface
