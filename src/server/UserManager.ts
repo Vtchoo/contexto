@@ -47,17 +47,17 @@ export class UserManager {
   }
 
   removeUserFromRoom(userId: string): void {
-    // Get current room first
-    const currentRoom = this.getUserCurrentRoom(userId)
-    if (currentRoom) {
-      this.gameManager.removeUserFromGame(userId, currentRoom)
+    // Get current game first
+    const currentGame = this.gameManager.getContextoManager().getCurrentPlayerGame(userId)
+    if (currentGame) {
+      this.gameManager.removeUserFromGame(userId, currentGame.id)
     }
   }
 
   getUserCurrentRoom(userId: string): string | null {
-    // Get the user's games and return the first one (users should only be in one room at a time)
-    const games = this.gameManager.getUserGames(userId)
-    return games.length > 0 ? games[0].id : null
+    // Use ContextoManager to get the user's current game and return its ID
+    const currentGame = this.gameManager.getContextoManager().getCurrentPlayerGame(userId)
+    return currentGame ? currentGame.id : null
   }
 
   getUserByUsername(username: string): User | null {

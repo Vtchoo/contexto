@@ -9,12 +9,15 @@ export type Game = ContextoDefaultGame | ContextoCompetitiveGame | ContextoBattl
 
 export class GameManager {
   private games = new Map<string, Game>()
-  private gamesByUser = new Map<string, Set<string>>()
   private contextoManager: ContextoManager
 
   constructor() {
     // Initialize a shared ContextoManager for web server games
     this.contextoManager = new ContextoManager()
+  }
+
+  getContextoManager(): ContextoManager {
+    return this.contextoManager
   }
 
   createGame(type: 'default' | 'competitive' | 'battle-royale' | 'stop', userId: string, word?: string | number | Date): string {
@@ -52,14 +55,8 @@ export class GameManager {
     const game = this.games.get(roomId)
     if (!game) return false
 
-    // Remove from user mappings
-    for (const [userId, gameIds] of this.gamesByUser) {
-      gameIds.delete(roomId)
-      if (gameIds.size === 0) {
-        this.gamesByUser.delete(userId)
-      }
-    }
-
+    // Note: Player cleanup is handled by individual game objects
+    // when they are removed from the games map
     return this.games.delete(roomId)
   }
 
@@ -73,10 +70,16 @@ export class GameManager {
       }
     }
 
-    if (!this.gamesByUser.has(userId)) {
-      this.gamesByUser.set(userId, new Set())
+    // Use ContextoManager to track the player's current game
+    // This enforces one-game-per-user rule
+    const currentGame = this.contextoManager.getCurrentPlayerGame(userId)
+    if (currentGame) {
+      this.contextoManager.leaveCurrentGame(userId)
     }
-    this.gamesByUser.get(userId)!.add(roomId)
+    
+    // Set the player's current game in ContextoManager
+    // Note: We manually update the playerGames mapping since we're managing games externally
+    (this.contextoManager as any).playerGames.set(userId, roomId)
   }
 
   removeUserFromGame(userId: string, roomId: string): void {
@@ -89,22 +92,18 @@ export class GameManager {
       }
     }
 
-    const userGames = this.gamesByUser.get(userId)
-    if (userGames) {
-      userGames.delete(roomId)
-      if (userGames.size === 0) {
-        this.gamesByUser.delete(userId)
-      }
-    }
+    // Use ContextoManager to handle player removal
+    this.contextoManager.leaveCurrentGame(userId)
   }
 
   getUserGames(userId: string): Game[] {
-    const gameIds = this.gamesByUser.get(userId)
-    if (!gameIds) return []
-
-    return Array.from(gameIds)
-      .map(id => this.games.get(id))
-      .filter((game): game is Game => game !== undefined)
+    // Use ContextoManager to get the user's current game
+    const currentGame = this.contextoManager.getCurrentPlayerGame(userId)
+    if (currentGame) {
+      // Return the game wrapped in an array to maintain the interface
+      return [currentGame]
+    }
+    return []
   }
 
   getAllGames(): Game[] {
@@ -166,7 +165,7 @@ export class GameManager {
       totalGames: allGames.length,
       activeGames: activeGames.length,
       gameTypes,
-      totalUsers: this.gamesByUser.size
+      totalUsers: (this.contextoManager as any).playerGames.size
     }
   }
 }
