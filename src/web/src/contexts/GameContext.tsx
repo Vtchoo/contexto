@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { gameApi, userApi, Player, Guess } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
@@ -21,9 +21,21 @@ function useGameHook() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Use ref to track if initialization is in progress to prevent race conditions
+  const initializationInProgress = useRef(false)
 
   // Initialize user first, then connect socket
   const initializeApp = async () => {
+    // Prevent double initialization (React StrictMode calls useEffect twice)
+    if (isInitialized || user || initializationInProgress.current) {
+      console.log('Already initialized or in progress, skipping...')
+      return
+    }
+
+    // Mark initialization as in progress
+    initializationInProgress.current = true
+
     try {
       console.log('Initializing user...')
       const userData = await userApi.initUser()
@@ -33,12 +45,12 @@ function useGameHook() {
       
       // Only connect socket after user is initialized
       // connect()
-      if (userData.currentRoom) {
-
-      }
     } catch (err) {
       console.error('Failed to initialize user:', err)
       setError('Falha ao inicializar usuário')
+    } finally {
+      // Always reset the flag when done (success or failure)
+      initializationInProgress.current = false
     }
   }
 
