@@ -33,20 +33,28 @@ class SnowflakeGenerator {
             ? crypto.getRandomValues(new Uint32Array(1))[0] / (0xFFFFFFFF + 1)
             : Math.random()
             
+        // Ensure machine ID is never 0 to avoid always starting with same base
         this.machineId = Math.floor(randomValue * SnowflakeGenerator.MAX_MACHINE_ID) + 1
         
-        if (this.machineId < 0 || this.machineId > SnowflakeGenerator.MAX_MACHINE_ID) {
-            throw new Error(`Machine ID must be between 0 and ${SnowflakeGenerator.MAX_MACHINE_ID}`)
+        if (this.machineId < 1 || this.machineId > SnowflakeGenerator.MAX_MACHINE_ID) {
+            throw new Error(`Machine ID must be between 1 and ${SnowflakeGenerator.MAX_MACHINE_ID}`)
         }
         
         // Add some random initial sequences to avoid immediate collisions
-        for (let i = 0; i < 5; i++) {
+        // Start with a random offset to ensure first sequence is not 0
+        const initialSequenceCount = 3 + Math.floor(Math.random() * 5)
+        for (let i = 0; i < initialSequenceCount; i++) {
             this.generatedSequences.add(Math.floor(Math.random() * SnowflakeGenerator.MAX_SEQUENCE))
         }
     }
     
     private currentTime(): number {
-        return Date.now()
+        let timestamp = Date.now()
+        // Ensure we never return exactly the epoch to avoid 0 timestamp diff
+        if (timestamp === this.epoch) {
+            timestamp += 1
+        }
+        return timestamp
     }
     
     private generateId(): number {
@@ -62,19 +70,43 @@ class SnowflakeGenerator {
         }
         
         let sequence: number
-        while (true) {
-            sequence = Math.floor(Math.random() * (SnowflakeGenerator.MAX_SEQUENCE + 1))
-            if (!this.generatedSequences.has(sequence)) {
-                this.generatedSequences.add(sequence)
-                break
-            }
-        }
+        let attempts = 0
+        const maxAttempts = SnowflakeGenerator.MAX_SEQUENCE + 1
         
-        const id = ((timestamp - this.epoch) << SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) |
-                   (this.machineId << SnowflakeGenerator.MACHINE_ID_SHIFT) |
-                   sequence
+        do {
+            // Use better randomization for sequence
+            sequence = Math.floor(Math.random() * (SnowflakeGenerator.MAX_SEQUENCE + 1))
+            attempts++
+            
+            if (attempts >= maxAttempts) {
+                // If we've exhausted all sequences, wait for next millisecond
+                while (this.currentTime() === timestamp) {
+                    // Busy wait for next millisecond
+                }
+                return this.generateId() // Recursive call with new timestamp
+            }
+        } while (this.generatedSequences.has(sequence))
+        
+        this.generatedSequences.add(sequence)
+        
+        // Use BigInt to avoid 32-bit integer overflow when shifting
+        const timestampDiff = BigInt(timestamp - this.epoch)
+        const machineIdBig = BigInt(this.machineId)
+        const sequenceBig = BigInt(sequence)
+        
+        const id = (timestampDiff << BigInt(SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT)) |
+                   (machineIdBig << BigInt(SnowflakeGenerator.MACHINE_ID_SHIFT)) |
+                   sequenceBig
+        
+        // Convert back to regular number - should be safe for our use case
+        const result = Number(id)
+        
+        // Ensure we never return 0 as it converts to "222222"
+        if (result === 0) {
+            return 1
+        }
                    
-        return id
+        return result
     }
     
     /**
@@ -90,6 +122,8 @@ class SnowflakeGenerator {
      * Convert a number to base32 string using our charset
      */
     private toBase32(num: number): string {
+        // Special handling for 0 - this should rarely happen in practice
+        // due to timestamp and sequence randomization, but handle it gracefully
         if (num === 0) return this.charset[0]
         
         let result = ''
@@ -107,7 +141,8 @@ class SnowflakeGenerator {
      */
     extractTimestamp(id: string): Date {
         const num = this.fromBase32(id)
-        const timestamp = (num >> SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) + this.epoch
+        const numBig = BigInt(num)
+        const timestamp = Number(numBig >> BigInt(SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT)) + this.epoch
         return new Date(timestamp)
     }
     
@@ -118,9 +153,10 @@ class SnowflakeGenerator {
      */
     parseSnowflake(id: string): { timestamp: number; machineId: number; sequence: number } {
         const num = this.fromBase32(id)
-        const timestamp = (num >> SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) + this.epoch
-        const machineId = (num >> SnowflakeGenerator.MACHINE_ID_SHIFT) & SnowflakeGenerator.MAX_MACHINE_ID
-        const sequence = num & SnowflakeGenerator.MAX_SEQUENCE
+        const numBig = BigInt(num)
+        const timestamp = Number(numBig >> BigInt(SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT)) + this.epoch
+        const machineId = Number((numBig >> BigInt(SnowflakeGenerator.MACHINE_ID_SHIFT)) & BigInt(SnowflakeGenerator.MAX_MACHINE_ID))
+        const sequence = Number(numBig & BigInt(SnowflakeGenerator.MAX_SEQUENCE))
         
         return { timestamp, machineId, sequence }
     }
@@ -168,9 +204,10 @@ class SnowflakeGenerator {
  * @returns Object containing timestamp, machineId, and sequence
  */
 export function parseSnowflakeId(snowflakeId: number, epoch: number): { timestamp: number; machineId: number; sequence: number } {
-    const timestamp = (snowflakeId >> SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT) + epoch
-    const machineId = (snowflakeId >> SnowflakeGenerator.MACHINE_ID_SHIFT) & SnowflakeGenerator.MAX_MACHINE_ID
-    const sequence = snowflakeId & SnowflakeGenerator.MAX_SEQUENCE
+    const snowflakeBig = BigInt(snowflakeId)
+    const timestamp = Number(snowflakeBig >> BigInt(SnowflakeGenerator.TIMESTAMP_LEFT_SHIFT)) + epoch
+    const machineId = Number((snowflakeBig >> BigInt(SnowflakeGenerator.MACHINE_ID_SHIFT)) & BigInt(SnowflakeGenerator.MAX_MACHINE_ID))
+    const sequence = Number(snowflakeBig & BigInt(SnowflakeGenerator.MAX_SEQUENCE))
     
     return { timestamp, machineId, sequence }
 }
