@@ -15,7 +15,7 @@ import { setupGameRoutes } from './routes/gameRoutes'
 import { setupRoomRoutes } from './routes/roomRoutes'
 import { setupUserRoutes } from './routes/userRoutes'
 import { setupSocketHandlers } from './socket/socketHandlers'
-import { User } from './User'
+import { Player } from '../models/Player'
 
 const app = express()
 const server = createServer(app)
@@ -41,14 +41,14 @@ const gameManager = new GameManager()
 const userManager = new UserManager(gameManager)
 
 // JWT Token middleware - authenticate users with JWT tokens
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
 	let userToken = req.cookies.contexto_token
-	let user: User | null = null
+	let user: Player | null = null
 	let newToken: string | undefined = undefined
 
 	if (userToken) {
 		// Verify existing token
-		const result = userManager.verifyAndRefreshToken(userToken)
+		const result = await userManager.verifyAndRefreshToken(userToken)
 		user = result.user
 		newToken = result.newToken
 
@@ -66,7 +66,7 @@ app.use((req, res, next) => {
 
 	if (!user) {
 		// Create new user with JWT token
-		const result = userManager.createUser()
+		const result = await userManager.createUser()
 		user = result.user
 		userToken = result.token
 
@@ -92,12 +92,12 @@ app.use('/api/rooms', setupRoomRoutes(gameManager, userManager))
 app.use('/api/users', setupUserRoutes(userManager))
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
 	res.json({
 		status: 'ok',
 		timestamp: new Date().toISOString(),
 		activeRooms: gameManager.getActiveRoomsCount(),
-		activeUsers: userManager.getActiveUsersCount()
+		activeUsers: await userManager.getActiveUsersCount()
 	})
 })
 

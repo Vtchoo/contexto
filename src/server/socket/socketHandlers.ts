@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
-import { User } from '../User'
+import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
 
@@ -13,7 +13,7 @@ interface SocketUser {
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
 
-  io.on('connection', (socket: Socket) => {
+  io.on('connection', async (socket: Socket) => {
     console.log(`🔌 User connected: ${socket.id}`)
 
     let socketUser: SocketUser | null = null
@@ -49,7 +49,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
       return
     }
 
-    const user = userManager.getUserById(payload.userId)
+    const user = await userManager.getUserById(payload.userId)
     if (!user) {
       console.error('User not found for token')
       socket.disconnect()
@@ -65,7 +65,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     console.log(`✅ User authenticated via socket: ${user.id}`)
 
     // Join room handler
-    socket.on('join_room', (data: { roomId: string }) => {
+    socket.on('join_room', async (data: { roomId: string }) => {
       try {
         if (!socketUser) {
           socket.emit('error', { error: 'Not authenticated' })
@@ -87,7 +87,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Leave current room if any
         const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
+        const user = payload ? await userManager.getUserById(payload.userId) : null
         const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
         if (currentRoom) {
           socket.leave(currentRoom)
@@ -125,14 +125,14 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     })
 
     // Leave room handler
-    socket.on('leave_room', () => {
+    socket.on('leave_room', async () => {
       try {
         if (!socketUser) {
           return
         }
 
         const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
+        const user = payload ? await userManager.getUserById(payload.userId) : null
         const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
         if (!user || !currentRoom) {
           return
@@ -172,7 +172,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
+        const user = payload ? await userManager.getUserById(payload.userId) : null
         const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
         if (!user || !currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
@@ -225,7 +225,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         // If game finished, update user stats
         if (game.finished && guess.distance === 0) {
           const payload = JWTService.verifyToken(socketUser.token)
-          const user = payload ? userManager.getUserById(payload.userId) : null
+          const user = payload ? await userManager.getUserById(payload.userId) : null
           if (user) {
             user.incrementGamesPlayed()
             user.incrementGamesWon()
@@ -250,7 +250,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     })
 
     // Start game handler
-    socket.on('start_game', () => {
+    socket.on('start_game', async () => {
       try {
         if (!socketUser) {
           socket.emit('error', { error: 'Not authenticated' })
@@ -258,7 +258,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
+        const user = payload ? await userManager.getUserById(payload.userId) : null
         const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
         if (!user || !currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
@@ -296,7 +296,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     })
 
     // Get closest guesses handler
-    socket.on('get_closest', (data: { count?: number }) => {
+    socket.on('get_closest', async (data: { count?: number }) => {
       try {
         if (!socketUser) {
           socket.emit('error', { error: 'Not authenticated' })
@@ -304,7 +304,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
+        const user = payload ? await userManager.getUserById(payload.userId) : null
         const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
         if (!user || !currentRoom) {
           socket.emit('error', { error: 'Not in a room' })
@@ -332,13 +332,13 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     })
 
     // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`🔌 User disconnected: ${socket.id}`)
 
       if (socketUser) {
         try {
           const payload = JWTService.verifyToken(socketUser.token)
-          const user = payload ? userManager.getUserById(payload.userId) : null
+          const user = payload ? await userManager.getUserById(payload.userId) : null
           const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
           if (user && currentRoom) {
             // Notify room about player leaving
@@ -364,9 +364,9 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
   })
 
   // Periodic cleanup
-  setInterval(() => {
+  setInterval(async () => {
     const removedGames = gameManager.cleanupOldGames()
-    const removedUsers = userManager.cleanupInactiveUsers()
+    const removedUsers = await userManager.cleanupInactiveUsers()
 
     if (removedGames > 0 || removedUsers > 0) {
       console.log(`🧹 Cleanup: Removed ${removedGames} old games and ${removedUsers} inactive users`)

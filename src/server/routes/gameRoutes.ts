@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
+import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
 
@@ -8,7 +9,7 @@ import JWTService from '../../utils/jwt'
 declare global {
   namespace Express {
     interface Request {
-      user?: any
+      user?: Player
       userToken?: string
     }
   }
@@ -26,10 +27,14 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Invalid game type' })
       }
 
-      const user = userManager.getUserById(req.user.id)
+      if (!req.user) {
+        return res.status(401).json({ error: 'User not authenticated' })
+      }
+
+      const user = await userManager.getUserById(req.user.id)
 
       if (!user) {
-        return res.status(401).json({ error: 'User not authenticated' })
+        return res.status(401).json({ error: 'User not found' })
       }
 
       const roomId = gameManager.createGame(type, user.id, gameId)
@@ -72,7 +77,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
 
       // Update user's current room
       const payload = JWTService.verifyToken(token)
-      const user = payload ? userManager.getUserById(payload.userId) : null
+      const user = payload ? await userManager.getUserById(payload.userId) : null
       if (user) {
         userManager.joinUserToRoom(user.id, roomId)
       }
@@ -119,7 +124,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       // If game finished, update user stats
       if (game.finished && guess.distance === 0) {
         const payload = JWTService.verifyToken(token)
-        const user = payload ? userManager.getUserById(payload.userId) : null
+        const user = payload ? await userManager.getUserById(payload.userId) : null
         if (user) {
           user.incrementGamesPlayed()
           user.incrementGamesWon()
@@ -178,7 +183,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
 
       // Update user's current room
       const payload = JWTService.verifyToken(token)
-      const user = payload ? userManager.getUserById(payload.userId) : null
+      const user = payload ? await userManager.getUserById(payload.userId) : null
       if (user) {
         userManager.removeUserFromRoom(user.id)
       }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { gameApi, userApi, User, Guess } from '../api/gameApi'
+import { gameApi, userApi, Player, Guess } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
 
 interface CurrentGame {
@@ -14,7 +14,7 @@ interface CurrentGame {
 }
 
 function useGameHook() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<Player | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
   const [currentGame, setCurrentGame] = useState<CurrentGame | null>(null)
   const [isConnected, setIsConnected] = useState(false)

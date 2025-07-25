@@ -54,13 +54,13 @@ export function setupUserRoutes(userManager: UserManager) {
         return res.status(400).json({ error: 'Username can only contain letters, numbers, underscores, and hyphens' })
       }
 
-      const success = userManager.setUsername(token, username)
+      const success = await userManager.setUsername(token, username)
       if (!success) {
         return res.status(400).json({ error: 'Username is already taken' })
       }
 
       const payload = JWTService.verifyToken(token)
-      const user = payload ? userManager.getUserById(payload.userId) : null
+      const user = payload ? await userManager.getUserById(payload.userId) : null
       res.json({
         message: 'Username set successfully',
         user: user!.toJSON()
@@ -74,17 +74,17 @@ export function setupUserRoutes(userManager: UserManager) {
   router.post('/username/anonymous', async (req: Request, res: Response) => {
     try {
       const token = req.userToken!
-      const anonymousUsername = userManager.generateAnonymousUsername()
+      const anonymousUsername = await userManager.generateAnonymousUsername()
 
-      const success = userManager.setUsername(token, anonymousUsername)
+      const success = await userManager.setUsername(token, anonymousUsername)
       if (!success) {
         // Try again with a different username
         const fallbackUsername = `Player${Date.now()}`
-        userManager.setUsername(token, fallbackUsername)
+        await userManager.setUsername(token, fallbackUsername)
       }
 
       const payload = JWTService.verifyToken(token)
-      const user = payload ? userManager.getUserById(payload.userId) : null
+      const user = payload ? await userManager.getUserById(payload.userId) : null
       res.json({
         message: 'Anonymous username generated successfully',
         user: user!.toJSON()
@@ -121,7 +121,7 @@ export function setupUserRoutes(userManager: UserManager) {
         return res.status(400).json({ error: 'Invalid username format' })
       }
 
-      const isTaken = userManager.isUsernameTaken(username)
+      const isTaken = await userManager.isUsernameTaken(username)
       res.json({
         username,
         available: !isTaken
@@ -136,7 +136,7 @@ export function setupUserRoutes(userManager: UserManager) {
     try {
       const { limit = 10, sortBy = 'winRate' } = req.query
 
-      let users = userManager.getAllUsers()
+      let users = (await userManager.getAllUsers())
         .filter(user => user.gamesPlayed > 0) // Only users who have played games
         .map(user => user.getStats())
 

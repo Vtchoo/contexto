@@ -12,7 +12,7 @@ const api = axios.create({
 })
 
 // Types
-export interface User {
+export interface Player {
   id: string
   username?: string
   gamesPlayed: number
@@ -124,13 +124,13 @@ export const roomApi = {
 
 export const userApi = {
   // Initialize user - ensures user exists and cookies are set
-  initUser: async (): Promise<User> => {
+  initUser: async (): Promise<Player> => {
     const response = await api.post('/api/users/init')
     return response.data.user
   },
 
   // User management
-  getCurrentUser: async (): Promise<User> => {
+  getCurrentUser: async (): Promise<Player> => {
     const response = await api.get('/api/users/me')
     return response.data
   },

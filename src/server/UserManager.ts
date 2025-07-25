@@ -1,34 +1,49 @@
-import { User } from './User'
+import { Player } from '../models/Player'
+import { getPlayerRepository } from '../repositories/PlayersRepository'
 import snowflakeGenerator from '../utils/snowflake'
 import JWTService from '../utils/jwt'
 import { GameManager } from './GameManager'
 
 export class UserManager {
-  private users = new Map<string, User>() // Maps user ID to User
-  private usersByUsername = new Map<string, User>()
+  private users = new Map<string, Player>() // In-memory cache for active users
+  private usersByUsername = new Map<string, Player>() // Cache for username lookups
   private gameManager: GameManager
+  private userRepository = getPlayerRepository()
 
   constructor(gameManager: GameManager) {
     this.gameManager = gameManager
   }
 
-  createUser(token?: string, username?: string): { user: User, token: string } {
+  async createUser(token?: string, username?: string): Promise<{ user: Player, token: string }> {
     // Generate a unique user ID
     const userId = snowflakeGenerator.generate()
     
     // Generate JWT token with user ID
     const jwtToken = token || JWTService.generateToken(userId)
 
-    const user = new User(userId, username)
+    const user = new Player(userId, username)
     
-    // Store user by ID only
-    this.users.set(userId, user)
-    
-    if (username) {
-      this.usersByUsername.set(username, user)
-    }
+    try {
+      // Save user to database
+      await this.userRepository.save(user)
+      
+      // Store user in memory cache
+      this.users.set(userId, user)
+      
+      if (username) {
+        this.usersByUsername.set(username, user)
+      }
 
-    return { user, token: jwtToken }
+      return { user, token: jwtToken }
+    } catch (error) {
+      console.error('Failed to create user in database:', error)
+      // Fallback to memory-only storage
+      this.users.set(userId, user)
+      if (username) {
+        this.usersByUsername.set(username, user)
+      }
+      return { user, token: jwtToken }
+    }
   }
 
   // Helper method to get user by JWT token
@@ -37,8 +52,30 @@ export class UserManager {
     return payload ? payload.userId : null
   }
 
-  getUserById(userId: string): User | null {
-    return this.users.get(userId) || null
+  async getUserById(userId: string): Promise<Player | null> {
+    // Check memory cache first
+    let user = this.users.get(userId)
+    if (user) {
+      return user
+    }
+
+    // Try to load from database
+    try {
+      const dbUser = await this.userRepository.findOne({ where: { id: userId } })
+      if (dbUser) {
+        user = dbUser
+        // Cache in memory for future access
+        this.users.set(userId, user)
+        if (user.username) {
+          this.usersByUsername.set(user.username, user)
+        }
+        return user
+      }
+    } catch (error) {
+      console.error('Failed to load user from database:', error)
+    }
+
+    return null
   }
 
   // Room management methods
@@ -60,24 +97,45 @@ export class UserManager {
     return currentGame ? currentGame.id : null
   }
 
-  getUserByUsername(username: string): User | null {
-    return this.usersByUsername.get(username) || null
+  async getUserByUsername(username: string): Promise<Player | null> {
+    // Check memory cache first
+    let user = this.usersByUsername.get(username)
+    if (user) {
+      return user
+    }
+
+    // Try to load from database
+    try {
+      const dbUser = await this.userRepository.findOne({ where: { username } })
+      if (dbUser) {
+        user = dbUser
+        // Cache in memory for future access
+        this.users.set(user.id, user)
+        this.usersByUsername.set(username, user)
+        return user
+      }
+    } catch (error) {
+      console.error('Failed to load user by username from database:', error)
+    }
+
+    return null
   }
 
-  setUsername(tokenOrId: string, username: string): boolean {
+  async setUsername(tokenOrId: string, username: string): Promise<boolean> {
     // Try to get user by ID first, then by parsing token
-    let user = this.getUserById(tokenOrId)
+    let user = await this.getUserById(tokenOrId)
     if (!user) {
       const userId = this.getUserIdFromToken(tokenOrId)
       if (userId) {
-        user = this.getUserById(userId)
+        user = await this.getUserById(userId)
       }
     }
     
     if (!user) return false
 
     // Check if username is already taken
-    if (this.usersByUsername.has(username)) {
+    const existingUser = await this.getUserByUsername(username)
+    if (existingUser && existingUser.id !== user.id) {
       return false
     }
 
@@ -90,50 +148,109 @@ export class UserManager {
     user.setUsername(username)
     this.usersByUsername.set(username, user)
 
+    // Save to database
+    try {
+      await this.userRepository.save(user)
+    } catch (error) {
+      console.error('Failed to save user to database:', error)
+    }
+
     return true
   }
 
-  isUsernameTaken(username: string): boolean {
-    return this.usersByUsername.has(username)
+  async isUsernameTaken(username: string): Promise<boolean> {
+    const user = await this.getUserByUsername(username)
+    return user !== null
   }
 
-  getAllUsers(): User[] {
-    return Array.from(this.users.values())
+  async getAllUsers(): Promise<Player[]> {
+    try {
+      // Get all users from database
+      const dbUsers = await this.userRepository.find()
+      
+      // Update memory cache with fresh data
+      this.users.clear()
+      this.usersByUsername.clear()
+      
+      for (const user of dbUsers) {
+        this.users.set(user.id, user)
+        if (user.username) {
+          this.usersByUsername.set(user.username, user)
+        }
+      }
+      
+      return dbUsers
+    } catch (error) {
+      console.error('Failed to load users from database:', error)
+      // Fallback to memory cache
+      return Array.from(this.users.values())
+    }
   }
 
-  getActiveUsersCount(): number {
-    return Array.from(this.users.values()).filter(user => user.isActive()).length
+  async getActiveUsersCount(): Promise<number> {
+    const users = await this.getAllUsers()
+    return users.filter(user => user.isActive()).length
   }
 
-  updateUserActivity(tokenOrId: string): void {
+  async updateUserActivity(tokenOrId: string): Promise<void> {
     // Try to get user by ID first, then by parsing token
-    let user = this.getUserById(tokenOrId)
+    let user = await this.getUserById(tokenOrId)
     if (!user) {
       const userId = this.getUserIdFromToken(tokenOrId)
       if (userId) {
-        user = this.getUserById(userId)
+        user = await this.getUserById(userId)
       }
     }
     
     if (user) {
       user.updateActivity()
+      try {
+        await this.userRepository.save(user)
+      } catch (error) {
+        console.error('Failed to save user activity to database:', error)
+      }
     }
   }
 
   // Cleanup inactive users (not accessed for 7 days)
-  cleanupInactiveUsers(): number {
+  async cleanupInactiveUsers(): Promise<number> {
     const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
     let removedCount = 0
 
-    for (const [userId, user] of this.users) {
-      if (user.lastActivity < sevenDaysAgo) {
-        if (user.username) {
-          this.usersByUsername.delete(user.username)
+    try {
+      // Delete from database
+      const result = await this.userRepository
+        .createQueryBuilder()
+        .delete()
+        .from(Player)
+        .where("last_activity < :sevenDaysAgo", { sevenDaysAgo })
+        .execute()
+      
+      removedCount = result.affected || 0
+
+      // Clean up memory cache
+      for (const [userId, user] of this.users) {
+        if (user.lastActivity < sevenDaysAgo) {
+          if (user.username) {
+            this.usersByUsername.delete(user.username)
+          }
+          // Clean up room mapping by removing user from all games
+          this.removeUserFromRoom(userId)
+          this.users.delete(userId)
         }
-        // Clean up room mapping by removing user from all games
-        this.removeUserFromRoom(userId)
-        this.users.delete(userId)
-        removedCount++
+      }
+    } catch (error) {
+      console.error('Failed to cleanup inactive users from database:', error)
+      // Fallback to memory-only cleanup
+      for (const [userId, user] of this.users) {
+        if (user.lastActivity < sevenDaysAgo) {
+          if (user.username) {
+            this.usersByUsername.delete(user.username)
+          }
+          this.removeUserFromRoom(userId)
+          this.users.delete(userId)
+          removedCount++
+        }
       }
     }
 
@@ -141,13 +258,13 @@ export class UserManager {
   }
 
   // Verify and refresh JWT tokens
-  verifyAndRefreshToken(token: string): { user: User | null; newToken?: string } {
+  async verifyAndRefreshToken(token: string): Promise<{ user: Player | null; newToken?: string }> {
     const payload = JWTService.verifyToken(token)
     if (!payload) {
       return { user: null }
     }
 
-    const user = this.getUserById(payload.userId)
+    const user = await this.getUserById(payload.userId)
     if (!user) {
       return { user: null }
     }
@@ -163,7 +280,7 @@ export class UserManager {
   }
 
   // Generate anonymous username
-  generateAnonymousUsername(): string {
+  async generateAnonymousUsername(): Promise<string> {
     const adjectives = [
       'Quick', 'Smart', 'Fast', 'Cool', 'Epic', 'Bold', 'Wild', 'Wise',
       'Brave', 'Sharp', 'Swift', 'Clever', 'Bright', 'Strong', 'Lucky'
@@ -184,10 +301,10 @@ export class UserManager {
       
       username = `${adjective}${noun}${number}`
       attempts++
-    } while (this.isUsernameTaken(username) && attempts < 10)
+    } while ((await this.isUsernameTaken(username)) && attempts < 10)
 
     // If still taken after 10 attempts, add snowflake
-    if (this.isUsernameTaken(username)) {
+    if (await this.isUsernameTaken(username)) {
       username = `Player${snowflakeGenerator.generate()}`
     }
 
