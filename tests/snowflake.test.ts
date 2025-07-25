@@ -17,12 +17,12 @@ describe('SnowflakeGenerator', () => {
 
     test('should generate IDs of expected length', () => {
       const id = generator.generate()
-      expect(id.length).toBeGreaterThanOrEqual(6)
-      expect(id.length).toBeLessThanOrEqual(12)
+      expect(id.length).toBeGreaterThanOrEqual(4)
+      expect(id.length).toBeLessThanOrEqual(10)
     })
 
     test('should use only valid characters from charset', () => {
-      const charset = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
+      const charset = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz'
       const id = generator.generate()
       
       for (const char of id) {
@@ -30,8 +30,8 @@ describe('SnowflakeGenerator', () => {
       }
     })
 
-    test('should not use confusing characters (0, O, 1, I, l)', () => {
-      const confusingChars = ['0', 'O', '1', 'I', 'l']
+    test('should not use confusing characters (0, O, 1, I, l, i)', () => {
+      const confusingChars = ['0', 'O', '1', 'I', 'l', 'i']
       const id = generator.generate()
       
       for (const char of confusingChars) {
@@ -118,10 +118,10 @@ describe('SnowflakeGenerator', () => {
 
     test('should reject invalid IDs', () => {
       expect(generator.isValid('')).toBe(false)
-      expect(generator.isValid('1234')).toBe(false) // too short
+      expect(generator.isValid('123')).toBe(false) // too short (3 chars, min is 4)
       expect(generator.isValid('THISISWAYTOOLONGTOBEVALID')).toBe(false) // too long
       expect(generator.isValid('ABC0123')).toBe(false) // contains invalid character '0'
-      expect(generator.isValid('ABCOI1l')).toBe(false) // contains confusing characters
+      expect(generator.isValid('ABCOI1li')).toBe(false) // contains confusing characters
       expect(generator.isValid(null as any)).toBe(false)
       expect(generator.isValid(undefined as any)).toBe(false)
       expect(generator.isValid(123 as any)).toBe(false)

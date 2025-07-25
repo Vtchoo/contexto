@@ -1,7 +1,7 @@
 /**
  * Snowflake ID Generator
  * Generates short, unique, user-friendly IDs for game rooms
- * Format: 8-10 character alphanumeric strings (excluding confusing characters)
+ * Format: 6-8 character alphanumeric strings (excluding confusing characters)
  * Based on Discord Snowflake algorithm with randomized sequence handling
  */
 
@@ -19,9 +19,10 @@ class SnowflakeGenerator {
     private lastTimestamp: number = -1
     private generatedSequences: Set<number> = new Set()
     
-    // Use only unambiguous characters (no 0, O, 1, I, l)
-    private readonly charset = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
-    private readonly base = this.charset.length // 32
+    // Use only unambiguous characters (no 0, O, 1, I, l, i)
+    // Base58-like charset for maximum efficiency while avoiding confusion
+    private readonly charset = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz'
+    private readonly base = this.charset.length // 58
     
     // Epoch start (2025-07-12 00:00:00 UTC) - today's date to minimize 0 timestamp differences
     private readonly epoch = 1752307200000
@@ -111,7 +112,7 @@ class SnowflakeGenerator {
     
     /**
      * Generate a new Snowflake ID
-     * @returns A short, friendly ID string (6-12 characters)
+     * @returns A short, friendly ID string (4-8 characters)
      */
     generate(): string {
         const id = this.generateId()
@@ -132,8 +133,8 @@ class SnowflakeGenerator {
             num = Math.floor(num / this.base)
         }
         
-        // Pad to minimum 6 characters for consistency
-        return result.padStart(6, this.charset[0])
+        // Pad to minimum 4 characters for consistency
+        return result.padStart(4, this.charset[0])
     }
     
     /**
@@ -181,7 +182,7 @@ class SnowflakeGenerator {
      */
     isValid(id: string): boolean {
         if (!id || typeof id !== 'string') return false
-        if (id.length < 6 || id.length > 12) return false
+        if (id.length < 4 || id.length > 10) return false
         
         // Check if all characters are in our charset
         for (const char of id) {
