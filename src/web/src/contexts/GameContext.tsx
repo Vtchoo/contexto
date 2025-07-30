@@ -71,7 +71,7 @@ function useGameHook() {
   }, [user])
 
   const connect = () => {
-    if (socket?.connected || !isInitialized) return
+    if (!isInitialized) return
 
     console.log('Connecting socket...')
     const newSocket = io('http://localhost:3001', {
