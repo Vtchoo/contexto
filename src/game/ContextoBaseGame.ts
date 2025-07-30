@@ -2,7 +2,7 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
-import { GameWord, Guess, IGame } from './interface'
+import { GameState, GameWord, Guess, IGame } from './interface'
 import type { ContextoManager } from './ContextoManager'
 
 abstract class ContextoBaseGame implements IGame {
@@ -281,6 +281,7 @@ abstract class ContextoBaseGame implements IGame {
     abstract tryWord(playerId: string, word: string): Promise<Guess>
     abstract getClosestGuesses(playerId: string, count?: number): GameWord[]
     abstract getGuessCount(playerId?: string): number
+    abstract getCurrentGameState(playerId: string): GameState
     
     // Helper method for tip calculation - each game implements differently
     protected abstract getGuessHistoryForTips(playerId: string): Array<[string, number]>

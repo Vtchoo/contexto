@@ -94,8 +94,8 @@ function useGameHook() {
         const newGame = {
           roomId: data.roomId,
           gameId: data.gameId,
-          gameMode: prev?.gameMode || 'default',
-          guesses: prev?.guesses || [],
+          gameMode: data?.gameMode || 'default',
+          guesses: data?.guesses || prev?.guesses || [],
           finished: prev?.finished || false,
           started: data.started !== undefined ? data.started : (prev?.started || (prev?.gameMode === 'default' || prev?.gameMode === 'competitive')),
           isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false)
@@ -142,8 +142,9 @@ function useGameHook() {
           guesses: [...prev.guesses, {
             word: data.word,
             distance: data.distance,
-            addedBy: data.playerId,
-            error: data.error
+            addedBy: data.addedBy,
+            error: data.error,
+            hidden: data.hidden
           }]
         }
       })
@@ -174,7 +175,7 @@ function useGameHook() {
     })
 
     newSocket.on('error', (data) => {
-      setError(data.message)
+      setError(data.error)
     })
 
     setSocket(newSocket)

@@ -1,9 +1,9 @@
 import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '../../../utils/misc';
 
-const getBarWidth = (distance) => {
+const getBarWidth = (distance: number) => {
 	const total = 40000;
 	const lambda = 0.5;
-	const pdf = (x) => lambda * Math.exp(-lambda * x);
+	const pdf = (x: number) => lambda * Math.exp(-lambda * x);
 	const startX = 0;
 	const endX = 100;
 	const startY = pdf(startX);
@@ -16,7 +16,7 @@ const getBarWidth = (distance) => {
 	return `${result}%`;
 };
 
-const getBarColor = (distance) => {
+const getBarColor = (distance: number) => {
 	if (distance < GREEN_THRESHOLD) {
 		return 'var(--green)';
 	}
@@ -26,7 +26,18 @@ const getBarColor = (distance) => {
 	return 'var(--red)';
 };
 
-function Row({ word, distance, highlight }) {
+interface RowProps {
+	word: string;
+	distance: number;
+	highlight?: boolean;
+	hidden?: boolean;
+	addedBy?: string;
+}
+
+function Row({ word, distance, highlight, hidden, addedBy }: RowProps) {
+
+	const displayWord = hidden ? `@${addedBy}` : word;
+	console.log({ word, distance, highlight, hidden, addedBy });
 	return (
 		<div className={`row-wrapper ${highlight ? 'current' : ''}`} key={word}>
 			<div className="outer-bar">
@@ -39,7 +50,7 @@ function Row({ word, distance, highlight }) {
 				/>
 			</div>
 			<div className="row">
-				<span>{word}</span>
+				<span>{displayWord}</span>
 				<span>{distance + 1}</span>
 			</div>
 		</div>

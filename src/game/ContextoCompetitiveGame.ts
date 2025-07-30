@@ -2,7 +2,7 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
-import { GameWord, Guess, IGame, PlayerScore } from './interface'
+import { GameState, GameWord, Guess, IGame, PlayerScore } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -218,6 +218,37 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
                 word: "",
                 error: "Não foi possível obter a resposta no momento"
             }
+        }
+    }
+
+    getCurrentGameState(playerId: string): GameState {
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        const otherPlayersGuesses = Object.entries(this.playerGuesses)
+            .filter(([id]) => id !== playerId)
+            .map(([id, guesses]) => guesses.reduce((acc, guess) => {
+                // get only the best guess for each player
+                if (!acc || (guess.distance !== undefined && guess.distance < acc.distance)) {
+                    return guess
+                }
+                return acc
+            }, null as Guess | null))
+            .filter(guess => guess !== null) // Filter out null guesses
+            .map(guess => ({
+                word: "",
+                distance: guess?.distance,
+                addedBy: guess?.addedBy || "",
+                error: guess?.error,
+                hidden: true,
+            } as Guess))
+        
+        const guesses = [...playerGuesses, ...otherPlayersGuesses].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+
+        return {
+            id: this.id,
+            started: this.started,
+            finished: this.finished,
+            players: this.players,
+            guesses: guesses,
         }
     }
 }

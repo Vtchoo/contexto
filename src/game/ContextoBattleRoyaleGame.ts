@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios'
 import { halfTipDistance } from './utils/misc'
-import { GameWord, Guess, PlayerScore } from './interface'
+import { GameState, GameWord, Guess, PlayerScore } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -432,6 +432,33 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
             }
         } catch (error) {
             return null
+        }
+    }
+
+    getCurrentGameState(playerId: string): GameState {
+        
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        const otherPlayersGuesses = Object.entries(this.playerGuesses)
+            .filter(([id]) => id !== playerId)
+            .map(([id, guesses]) => guesses || [])
+            .flat()
+            .filter(guess => guess !== null) // Filter out null guesses
+            .map(guess => ({
+                word: "",
+                distance: guess?.distance,
+                addedBy: guess?.addedBy || "",
+                error: guess?.error,
+                hidden: true,
+            } as Guess))
+        
+        const guesses = [...playerGuesses, ...otherPlayersGuesses].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+
+        return {
+            id: this.id,
+            started: this.started,
+            finished: this.finished,
+            players: this.players,
+            guesses: guesses,
         }
     }
 }

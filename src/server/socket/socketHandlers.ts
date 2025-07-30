@@ -4,11 +4,27 @@ import { UserManager } from '../UserManager'
 import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
+import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from '../../game'
+import { IGame } from '../../game/interface'
 
 interface SocketUser {
   token: string
   userId: string
   username?: string
+}
+
+// 'default' | 'competitive' | 'battle-royale' | 'stop'
+const getGameMode = (game: IGame): string => {
+	if (game instanceof ContextoDefaultGame) {
+		return 'default';
+	} else if (game instanceof ContextoCompetitiveGame) {
+		return 'competitive';
+	} else if (game instanceof ContextoBattleRoyaleGame) {
+		return 'battle-royale';
+	} else if (game instanceof ContextoStopGame) {
+		return 'stop';
+	}
+	return 'default';
 }
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
@@ -81,7 +97,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         const game = gameManager.getGame(roomId)
         if (!game) {
-          socket.emit('error', { error: 'Room not found' })
+          socket.emit('error', { error: `Room ${roomId} not found` })
           return
         }
 
@@ -109,13 +125,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           userId: socketUser.userId,
           username: socketUser.username
         })
+        
+        const gameState = game.getCurrentGameState(socketUser.userId)
 
         socket.emit('room_joined', {
           roomId,
+          id: gameState.id,
           gameId: game.gameId,
           finished: game.finished,
           started: game.started,
-          isHost: game.isHost(socketUser.userId)
+          isHost: game.isHost(socketUser.userId),
+          guesses: gameState.guesses,
+          gameMode: getGameMode(game),
         })
 
         console.log(`🏠 User ${socketUser.userId} joined room ${roomId}`)
@@ -214,12 +235,12 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Emit guess to other players in room (with spoiler for multiplayer games)
         socket.to(roomId).emit('player_guess', {
-          userId: socketUser.userId,
-          username: socketUser.username,
-          word: guess.error ? guess.word : `||${guess.word}||`, // Spoiler for valid guesses
+          word: game instanceof ContextoDefaultGame ? guess.word : ``, // Spoiler for valid guesses in default game
           distance: guess.distance,
           error: guess.error,
-          gameFinished: game.finished
+          gameFinished: game.finished,
+          addedBy: socketUser.userId,
+          hidden: game instanceof ContextoDefaultGame ? false : true, // Hide guesses in multiplayer games
         })
 
         // If game finished, update user stats

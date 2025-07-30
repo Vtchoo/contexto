@@ -2,7 +2,7 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance, nextTipDistance, randomTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
-import { GameWord, Guess, IGame } from './interface'
+import { GameState, GameWord, Guess, IGame } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -141,6 +141,16 @@ class ContextoDefaultGame extends ContextoBaseGame {
             this.finished = true
         }
         return result
+    }
+
+    getCurrentGameState(playerId: string): GameState {
+        return {
+            id: this.id,
+            started: this.started,
+            finished: this.finished,
+            players: this.players,
+            guesses: this.guesses
+        }
     }
 }
 

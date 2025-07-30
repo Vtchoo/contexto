@@ -200,14 +200,14 @@ function HomePage() {
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess, startGame } = useGame()
+  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess, startGame, user } = useGame()
 
   // Handle URL room parameter
   useEffect(() => {
     const roomParam = searchParams.get('room')
     if (roomParam && isConnected && !currentGame?.roomId && !showDemo) {
       // Auto-join room from URL parameter
-      joinRoom(roomParam.toUpperCase())
+      joinRoom(roomParam)
         .then(() => {
           setShowDemo(true)
           // Remove the room parameter from URL after joining
@@ -248,7 +248,7 @@ function HomePage() {
     if (!roomIdInput.trim()) return
 
     try {
-      await joinRoom(roomIdInput.trim().toUpperCase())
+      await joinRoom(roomIdInput.trim())
       setShowDemo(true)
     } catch (error) {
       console.error('Failed to join room:', error)
@@ -277,6 +277,7 @@ function HomePage() {
             isHost={currentGame?.isHost || false}
             onStartGame={startGame}
             loading={loading}
+            user={user}
           />
         </DemoGame>
       </Container>
@@ -338,7 +339,7 @@ function HomePage() {
             value={roomIdInput}
             onChange={(e) => setRoomIdInput(e.target.value)}
             disabled={!isConnected || loading}
-            maxLength={6}
+            // maxLength={6}
           />
           <JoinRoomButton type="submit" disabled={!isConnected || loading || !roomIdInput.trim()}>
             {loading ? 'Entrando...' : 'Entrar'}

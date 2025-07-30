@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import Row from './original_Row'
 import { strings } from '../constants/strings'
+import { Player } from '@/api/gameApi'
 
 interface Guess {
   word: string
   distance: number
   addedBy?: string
   error?: string
+  hidden?: boolean // For multiplayer, to hide guesses until revealed
 }
 
 interface GameInterfaceProps {
@@ -20,6 +22,7 @@ interface GameInterfaceProps {
   isHost?: boolean
   onStartGame?: () => void
   loading: boolean
+  user: Player
 }
 
 function GameInterface({ 
@@ -32,7 +35,8 @@ function GameInterface({
   gameStarted,
   isHost,
   onStartGame,
-  loading 
+  loading,
+  user,
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
@@ -110,7 +114,9 @@ function GameInterface({
   const isWinner = sortedGuesses.some(guess => guess.distance === 0)
   
   // Get last guess for highlighting
-  const lastGuessData = guesses.length > 0 ? guesses[guesses.length - 1] : null
+  // const lastGuessData = guesses.length > 0 ? guesses[guesses.length - 1] : null
+  // find last guess for the current player
+  const lastGuessData = guesses.length > 0 ? guesses.filter(guess => guess.addedBy === user.id).pop() : null
 
   // Show message based on game state
   let message = null
@@ -311,6 +317,8 @@ function GameInterface({
               word={guess.word}
               distance={guess.distance}
               highlight={lastGuessData?.word === guess.word}
+              hidden={guess.hidden}
+              addedBy={guess.addedBy}
             />
           ))}
           
