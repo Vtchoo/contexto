@@ -17,11 +17,13 @@ import { setupUserRoutes } from './routes/userRoutes'
 import { setupSocketHandlers } from './socket/socketHandlers'
 import { Player } from '../models/Player'
 
+const corsOrigin = process.env.FRONTEND_URL || ["http://localhost:3000", "http://localhost:3002"]
+
 const app = express()
 const server = createServer(app)
 const io = new Server(server, {
 	cors: {
-		origin: ["http://localhost:3000", "http://localhost:3002"],
+		origin: corsOrigin,
 		credentials: true
 	}
 })
@@ -30,7 +32,7 @@ const io = new Server(server, {
 app.use(helmet())
 app.use(compression())
 app.use(cors({
-	origin: ["http://localhost:3000", "http://localhost:3002"],
+	origin: corsOrigin,
 	credentials: true
 }))
 app.use(express.json())
