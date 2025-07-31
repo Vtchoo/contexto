@@ -15,10 +15,15 @@ export interface Guess {
 }
 
 export interface IGame {
+    id: string
     gameId: number
     // players: string[]
     // guesses: GameWord[]
+    started: boolean
     finished: boolean
+    guessCount: number
+    allowTips: boolean
+    allowGiveUp: boolean
 
     addPlayer(playerId: string): void
     removePlayer(playerId: string): void
@@ -27,6 +32,8 @@ export interface IGame {
     getClosestGuesses(playerId: string, count?: number): GameWord[]
     startGame(): void
     isHost(playerId: string): boolean
+    getPlayerCount(): number
+    getCurrentGameState(playerId: string): GameState
 }
 
 export interface PlayerScore {

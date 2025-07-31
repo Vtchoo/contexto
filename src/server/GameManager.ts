@@ -4,8 +4,9 @@ import { ContextoBattleRoyaleGame } from '../game/ContextoBattleRoyaleGame'
 import { ContextoStopGame } from '../game/ContextoStopGame'
 import { ContextoManager } from '../game/ContextoManager'
 import snowflakeGenerator from '../utils/snowflake'
+import { IGame } from '../game/interface'
 
-export type Game = ContextoDefaultGame | ContextoCompetitiveGame | ContextoBattleRoyaleGame | ContextoStopGame
+export type Game = IGame
 
 export class GameManager {
   private contextoManager: ContextoManager

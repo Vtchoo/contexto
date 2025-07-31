@@ -18,6 +18,7 @@ abstract class ContextoBaseGame implements IGame {
     allowGiveUp = true
     started = false
     abstract finished: boolean
+    abstract guessCount: number
 
     constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
         this.manager = manager

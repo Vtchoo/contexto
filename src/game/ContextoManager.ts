@@ -1,5 +1,5 @@
 import { getTodaysGameId } from './utils/misc'
-import { GameWord } from './interface'
+import { GameWord, IGame } from './interface'
 import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
 import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
@@ -8,7 +8,7 @@ import { ContextoBattleRoyaleGame } from './ContextoBattleRoyaleGame'
 
 class ContextoManager {
 
-    private games: Map<string, ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame> = new Map()
+    private games: Map<string, IGame> = new Map()
     private playerGames: Map<string, string> = new Map() // playerId -> gameId , used to track which game a player is currently playing
 
     private memoryCache: Map<string, GameWord> = new Map() // In-memory cache for fast access during session
@@ -26,7 +26,7 @@ class ContextoManager {
         return [game, justStarted] as const
     }
 
-    public getCurrentPlayerGame(playerId: string): ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame | undefined {
+    public getCurrentPlayerGame(playerId: string): IGame | undefined {
         const gameId = this.playerGames.get(playerId)
         if (gameId) {
             return this.games.get(gameId)
@@ -35,34 +35,27 @@ class ContextoManager {
     }
 
     public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default', gameIdOrDate?: number | Date) {
+        let game: IGame
         if (gameType === 'competitive') {
-            // Create a new competitive game room
-            const game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
-            this.games.set(game.id, game)
-            this.playerGames.set(playerId, game.id)
-            return game
+            game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
         } else if (gameType === 'stop') {
-            // Create a new stop game room
-            const game = new ContextoStopGame(playerId, this, gameIdOrDate)
-            this.games.set(game.id, game)
-            this.playerGames.set(playerId, game.id)
-            return game
+            game = new ContextoStopGame(playerId, this, gameIdOrDate)
         } else if (gameType === 'battle-royale') {
-            // Create a new battle royale game room
-            const game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
-            this.games.set(game.id, game)
-            this.playerGames.set(playerId, game.id)
-            return game
+            game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
         } else {
-            const game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
-            this.games.set(game.id, game)
-            this.playerGames.set(playerId, game.id)
-            return game
+            game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
         }
+
+        if (!game)
+            throw new Error("Failed to create game: Game is undefined")
+
+        this.games.set(game.id, game)
+        this.playerGames.set(playerId, game.id)
+        return game
     }
 
     // Unified method to join any game by ID
-    public joinGame(playerId: string, gameInstanceId: string): ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame {
+    public joinGame(playerId: string, gameInstanceId: string): IGame {
         // Check if player is already in a game
         const currentGame = this.getCurrentPlayerGame(playerId)
         if (currentGame) {
@@ -110,7 +103,7 @@ class ContextoManager {
     }
 
     // Unified method to get any game by ID
-    public getGameInfo(gameInstanceId: string): { game: ContextoDefaultGame | ContextoCompetitiveGame | ContextoStopGame | ContextoBattleRoyaleGame | null; exists: boolean } {
+    public getGameInfo(gameInstanceId: string): { game: IGame | null; exists: boolean } {
         const game = this.games.get(gameInstanceId)
         return {
             game: game || null,
