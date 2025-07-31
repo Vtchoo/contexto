@@ -129,10 +129,11 @@ const Button = styled.button`
   }
 `;
 
-interface GameIdSelection {
-  type: 'today' | 'id' | 'date' | 'random';
-  id?: number | Date | 'random';
-}
+type GameIdSelection =
+  | { type: 'today', id?: undefined }
+  | { type: 'id'; id?: number }
+  | { type: 'date'; id?: Date }
+  | { type: 'random'; id: 'random' };
 
 const predefinedRules = {
   'default': {
@@ -289,7 +290,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
                   value={gameId.id?.toISOString().split('T')[0] || ''}
                   onChange={e => setGameId({ ...gameId, id: new Date(e.target.value) })}
                   style={{ width: "100%" }}
-                  $invalid={new Date(gameId.id).getTime() > new Date().getTime()}
+                  $invalid={gameId.id && gameId.id?.getTime() > new Date().getTime()}
                 />
               )}
             </Row>
