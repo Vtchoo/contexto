@@ -13,6 +13,7 @@ interface CurrentGame {
   finished: boolean
   started: boolean
   isHost: boolean
+  players?: string[] // List of player IDs in the game
 }
 
 function useGameHook() {
@@ -100,7 +101,8 @@ function useGameHook() {
           guesses: data?.guesses || prev?.guesses || [],
           finished: prev?.finished || false,
           started: data.started !== undefined ? data.started : (prev?.started || (prev?.gameMode === 'default' || prev?.gameMode === 'competitive')),
-          isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false)
+          isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false),
+          players: data.players || prev?.players || []
         }
         console.log('Setting currentGame to:', newGame) // Debug log
         return newGame
@@ -175,6 +177,35 @@ function useGameHook() {
         }
       })
     })
+
+    // Listen for new player joining the room
+    newSocket.on('player_joined', (data) => {
+      setCurrentGame(prev => {
+        alert(`Novo jogador entrou: ${data.userId}`) // Debug log
+        if (!prev) return null;
+        // Update players list if provided
+        // {
+        //   userId: socketUser.userId,
+        //   username: socketUser.username
+        // }
+        return {
+          ...prev,
+          players: [...(prev.players || []), data.userId],
+        };
+      });
+    });
+
+    // Listen for player leaving the room
+    newSocket.on('player_left', (data) => {
+      setCurrentGame(prev => {
+        if (!prev) return null;
+        // Remove the player from the list
+        return {
+          ...prev,
+          players: (prev.players || []).filter(id => id !== data.userId),
+        };
+      });
+    });
 
     newSocket.on('error', (data) => {
       setError(data.error)

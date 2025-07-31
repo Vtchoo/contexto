@@ -259,7 +259,7 @@ const DemoGame = styled.div`
 
 function HomePage() {
   const [selectedMode, setSelectedMode] = useState<GameMode>('default')
-  const [showDemo, setShowDemo] = useState(false)
+  const [showGame, setShowGame] = useState(false)
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
@@ -278,11 +278,11 @@ function HomePage() {
   // Handle URL room parameter
   useEffect(() => {
     const roomParam = searchParams.get('room')
-    if (roomParam && isConnected && !currentGame?.roomId && !showDemo) {
+    if (roomParam && isConnected && !currentGame?.roomId && !showGame) {
       // Auto-join room from URL parameter
       joinRoom(roomParam)
         .then(() => {
-          setShowDemo(true)
+          setShowGame(true)
           // Remove the room parameter from URL after joining
           const newParams = new URLSearchParams(searchParams)
           newParams.delete('room')
@@ -292,7 +292,7 @@ function HomePage() {
           console.error('Failed to join room from URL:', error)
         })
     }
-  }, [searchParams, isConnected, currentGame?.roomId, showDemo, joinRoom, setSearchParams])
+  }, [searchParams, isConnected, currentGame?.roomId, showGame, joinRoom, setSearchParams])
 
   const handleQuickPlay = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -300,7 +300,7 @@ function HomePage() {
 
     try {
       await quickPlay(quickPlayWord.trim())
-      setShowDemo(true)
+      setShowGame(true)
       setQuickPlayWord('') // Clear the input after successful quick play
     } catch (error) {
       console.error('Failed to start quick play:', error)
@@ -310,7 +310,7 @@ function HomePage() {
   const handleCreateRoom = async () => {
     try {
       await createGame(selectedMode)
-      setShowDemo(true)
+      setShowGame(true)
     } catch (error) {
       console.error('Failed to create room:', error)
     }
@@ -322,7 +322,7 @@ function HomePage() {
 
     try {
       await joinRoom(roomIdInput.trim())
-      setShowDemo(true)
+      setShowGame(true)
     } catch (error) {
       console.error('Failed to join room:', error)
     }
@@ -338,7 +338,7 @@ function HomePage() {
     setCustomGameLoading(true)
     try {
       await createGame(options.gameMode, options)
-      setShowDemo(true)
+      setShowGame(true)
       setShowCustomModal(false)
       // TODO: Pass allowTips, allowGiveUp, maxPlayers to backend if supported
     } catch (error) {
@@ -355,7 +355,7 @@ function HomePage() {
     { key: 'battle-royale' as GameMode, name: 'Battle Royale', description: '"Alguém já usou essa palavra"' }
   ]
 
-  if (showDemo) {
+  if (showGame) {
     return (
       <Container>
         <DemoGame>
@@ -371,6 +371,7 @@ function HomePage() {
             onStartGame={startGame}
             loading={loading}
             user={user}
+            players={currentGame?.players || []}
           />
         </DemoGame>
       </Container>

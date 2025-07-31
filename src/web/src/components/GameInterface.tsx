@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import Row from './original_Row'
+import { PlayerAvatar } from './PlayerAvatar';
 import { strings } from '../constants/strings'
 import { Player } from '@/api/gameApi'
 
@@ -23,6 +24,7 @@ interface GameInterfaceProps {
   onStartGame?: () => void
   loading: boolean
   user: Player
+  players?: string[]
 }
 
 function GameInterface({ 
@@ -37,6 +39,7 @@ function GameInterface({
   onStartGame,
   loading,
   user,
+  players = []
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
@@ -80,6 +83,8 @@ function GameInterface({
   const sortedGuesses = [...guesses]
     .filter(guess => !guess.error)
     .sort((a, b) => a.distance - b.distance)
+  
+  const playerGuesses = sortedGuesses.filter(guess => guess.addedBy === user.id)
 
   const errorGuesses = guesses.filter(guess => guess.error)
 
@@ -111,12 +116,12 @@ function GameInterface({
     }
   }
 
-  const isWinner = sortedGuesses.some(guess => guess.distance === 0)
+  const isWinner = playerGuesses.some(guess => guess.distance === 0)
   
   // Get last guess for highlighting
   // const lastGuessData = guesses.length > 0 ? guesses[guesses.length - 1] : null
   // find last guess for the current player
-  const lastGuessData = guesses.length > 0 ? guesses.filter(guess => guess.addedBy === user.id).pop() : null
+  const lastGuessData = playerGuesses.length > 0 ? playerGuesses.pop() : null
 
   // Show message based on game state
   let message = null
@@ -304,6 +309,16 @@ function GameInterface({
 
         {message}
 
+        {players.length > 1 && (
+          <div className="player-list" style={{ paddingBlock: '1rem' }}>
+            <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
+              {players.map(playerId => (
+                <PlayerAvatar key={playerId} id={playerId} size={36} />
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="guess-history">
           {/* Show valid guesses sorted by distance */}
           {sortedGuesses.map((guess, index) => (
@@ -319,6 +334,7 @@ function GameInterface({
               highlight={lastGuessData?.word === guess.word}
               hidden={guess.hidden}
               addedBy={guess.addedBy}
+              playerId={user.id} // Pass current user's ID for multiplayer context
             />
           ))}
           

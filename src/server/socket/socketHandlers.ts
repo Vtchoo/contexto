@@ -137,6 +137,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           isHost: game.isHost(socketUser.userId),
           guesses: gameState.guesses,
           gameMode: getGameMode(game),
+          players: gameState.players,
         })
 
         console.log(`🏠 User ${socketUser.userId} joined room ${roomId}`)

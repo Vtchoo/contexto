@@ -1,4 +1,5 @@
 import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '../../../utils/misc';
+import { PlayerAvatar } from './PlayerAvatar';
 
 const getBarWidth = (distance: number) => {
 	const total = 40000;
@@ -32,9 +33,10 @@ interface RowProps {
 	highlight?: boolean;
 	hidden?: boolean;
 	addedBy?: string;
+	playerId?: string; // Optional, used for multiplayer to show the player who added the guess
 }
 
-function Row({ word, distance, highlight, hidden, addedBy }: RowProps) {
+function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps) {
 
 	const displayWord = hidden ? `@${addedBy}` : word;
 	console.log({ word, distance, highlight, hidden, addedBy });
@@ -50,7 +52,12 @@ function Row({ word, distance, highlight, hidden, addedBy }: RowProps) {
 				/>
 			</div>
 			<div className="row">
-				<span>{displayWord}</span>
+				<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+					{displayWord}
+					{addedBy && (addedBy !== playerId) && (
+						<PlayerAvatar id={addedBy} size={24} />
+					)}
+				</div>
 				<span>{distance + 1}</span>
 			</div>
 		</div>
