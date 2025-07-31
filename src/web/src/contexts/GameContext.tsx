@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { gameApi, userApi, Player, Guess } from '../api/gameApi'
+import { gameApi, userApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
 
 interface CurrentGame {
@@ -190,7 +190,7 @@ function useGameHook() {
     }
   }
 
-  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number): Promise<string> => {
+  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', options?: CreateGameOptions): Promise<string> => {
     if (!isInitialized) {
       setError('Aplicação não foi inicializada')
       throw new Error('Application not initialized')
@@ -200,7 +200,7 @@ function useGameHook() {
     setError(null)
 
     try {
-      const response = await gameApi.createGame(type, gameId)
+      const response = await gameApi.createGame(type, options)
 
       // Initialize the game state
       const initialGame = {

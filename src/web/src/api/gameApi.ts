@@ -42,6 +42,13 @@ export interface GameRoom {
   createdAt: string
 }
 
+export interface CreateGameOptions {
+  gameId?: number | Date | 'random'
+  allowTips?: boolean
+  allowGiveUp?: boolean
+  maxPlayers?: number
+}
+
 export interface CreateGameResponse {
   roomId: string
   gameId: number
@@ -72,8 +79,8 @@ export interface RoomInfo {
 // API functions
 export const gameApi = {
   // Game management
-  createGame: async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', gameId?: number): Promise<CreateGameResponse> => {
-    const response = await api.post('/api/game/create', { type, gameId })
+  createGame: async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', options?: CreateGameOptions): Promise<CreateGameResponse> => {
+    const response = await api.post('/api/game', { ...options, type })
     return response.data
   },
 

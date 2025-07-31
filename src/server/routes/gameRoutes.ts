@@ -19,7 +19,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
   const router = Router()
 
   // Create a new game
-  router.post('/create', async (req: Request, res: Response) => {
+  router.post('/', async (req: Request, res: Response) => {
     try {
       const { type, gameId } = req.body
 
