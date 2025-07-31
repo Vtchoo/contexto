@@ -5,6 +5,8 @@ import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
 import { ContextoStopGame } from './ContextoStopGame'
 import { ContextoBattleRoyaleGame } from './ContextoBattleRoyaleGame'
+import GameApi from './gameApi'
+import { getPrefetchedGamesRepository } from '../repositories/PrefetchedGamesRepository'
 
 class ContextoManager {
 
@@ -56,7 +58,58 @@ class ContextoManager {
 
         this.games.set(game.id, game)
         this.playerGames.set(playerId, game.id)
+        this.prefetchClosestWords(game.gameId)
         return game
+    }
+
+    private async prefetchClosestWords(gameId: number) {
+
+        // Prefetch words for the game ID
+        // const queryRunner = dataSource.createQueryRunner()
+        // const transaction = await queryRunner.startTransaction()
+
+        try {
+            const gameApi = GameApi(undefined, gameId)
+            const gameWasPrefetched = await getPrefetchedGamesRepository().findOne({
+                where: { id: gameId }
+            })
+            if (gameWasPrefetched) {
+                console.log(`Game ${gameId} was already prefetched, skipping`)
+                return
+            }
+            const { data }: any = await gameApi.getClosestWords()
+            const words = data?.words
+            if (!words || words.length === 0) {
+                console.log(`No words found for game ${gameId}, skipping prefetch`)
+                return
+            }
+            const repository = getCachedWordsRepository()
+            const existingWords = await repository.find({
+                where: { gameId },
+                select: ['word']
+            })
+            const existingWordsSet = new Set(existingWords.map(w => w.word.toLowerCase()))
+            // Filter out words that are already cached
+            const newWords = words.filter((word: string) => !existingWordsSet.has(word.toLowerCase()))
+            if (newWords.length === 0) {
+                console.log(`All words for game ${gameId} are already cached, skipping prefetch`)
+                return
+            }
+            await repository.save(newWords.map((word: string, index) => ({
+                gameId,
+                word: word,
+                lemma: word,
+                distance: index,
+            })))
+
+            // Mark this game as prefetched
+            const prefetchedGameRepository = getPrefetchedGamesRepository()
+            await prefetchedGameRepository.save({
+                id: gameId,
+            })
+        } catch (error) {
+            console.log(`Error prefetching words for game ${gameId}:`, error)
+        }
     }
 
     // Unified method to join any game by ID
