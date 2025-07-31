@@ -280,7 +280,7 @@ function HomePage() {
   const gameModes = [
     { key: 'default' as GameMode, name: 'Clássico', description: 'Jogo tradicional ou cooperativo' },
     { key: 'competitive' as GameMode, name: 'Competitivo', description: 'Joguem juntos' },
-    { key: 'stop' as GameMode, name: 'Stop', description: 'Primeiro a acertar ganha' },
+    { key: 'stop' as GameMode, name: 'Stop', description: 'O primeiro a acertar ganha' },
     { key: 'battle-royale' as GameMode, name: 'Battle Royale', description: '"Alguém já usou essa palavra"' }
   ]
 
