@@ -84,7 +84,7 @@ function GameInterface({
     .filter(guess => !guess.error)
     .sort((a, b) => a.distance - b.distance)
   
-  const playerGuesses = sortedGuesses.filter(guess => guess.addedBy === user.id)
+  const playerGuesses = guesses.filter(guess => guess.addedBy === user.id)
 
   const errorGuesses = guesses.filter(guess => guess.error)
 
@@ -121,7 +121,7 @@ function GameInterface({
   // Get last guess for highlighting
   // const lastGuessData = guesses.length > 0 ? guesses[guesses.length - 1] : null
   // find last guess for the current player
-  const lastGuessData = playerGuesses.length > 0 ? playerGuesses.pop() : null
+  const lastGuessData = playerGuesses.length > 0 ? [...playerGuesses].pop() : null
 
   // Show message based on game state
   let message = null
