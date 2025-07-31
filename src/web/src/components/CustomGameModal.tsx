@@ -1,7 +1,7 @@
 
 import { GameMode } from '@/api/gameApi';
 import React, { useState, useRef, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 interface CustomGameModalProps {
   isOpen: boolean;
@@ -15,6 +15,11 @@ interface CustomGameModalProps {
     customDate?: string;
   }) => void;
 }
+
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+`
 
 const StyledDialog = styled.dialog`
   border: none;
@@ -33,16 +38,12 @@ const StyledDialog = styled.dialog`
   margin: 0;
   z-index: 1001;
   &[open] {
-    animation: fadeIn 0.18s;
+    animation: ${fadeIn} 0.18s;
   }
   &::backdrop {
     background: rgba(0,0,0,0.5);
     z-index: 1000;
   }
-  /* @keyframes fadeIn {
-    from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); }
-    to { opacity: 1; transform: translate(-50%, -50%); }
-  } */
 `;
 
 const ModalContent = styled.div`
@@ -135,7 +136,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (isOpen && !dialog.open) {
-      dialog.showModal();
+      dialog.show();
     } else if (!isOpen && dialog.open) {
       dialog.close();
     }
