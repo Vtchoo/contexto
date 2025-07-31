@@ -28,9 +28,20 @@ const Title = styled.h1`
 const Subtitle = styled.p`
   color: var(--secondary-text);
   font-size: 1.1rem;
-  margin-bottom: 1rem;
+  /* margin-bottom: 1rem; */
   text-align: center;
   line-height: 1.6;
+`
+
+const HowToPlaySection = styled.div`
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 `
 
 const QuickStartSection = styled.div`
@@ -256,6 +267,14 @@ function HomePage() {
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [customGameLoading, setCustomGameLoading] = useState(false)
 
+  const [showHowToPlay, setShowHowToPlay] = useState(false)
+  useEffect(() => {
+    // Check if the user has seen the how-to-play section
+    const hasSeenHowToPlay = localStorage.getItem('hasSeenHowToPlay')
+    if (!hasSeenHowToPlay || hasSeenHowToPlay !== 'true')
+      setShowHowToPlay(true)
+  }, [])
+
   // Handle URL room parameter
   useEffect(() => {
     const roomParam = searchParams.get('room')
@@ -361,9 +380,9 @@ function HomePage() {
   return (
     <Container>
       <Title>CONTEXTO</Title>
-      <Subtitle>
+      {/* <Subtitle>
         Encontre a palavra secreta usando pistas de contexto semântico. Quanto menor o número, mais próximo você está!
-      </Subtitle>
+      </Subtitle> */}
 
       <QuickStartSection>
         <SectionTitle>🚀 Jogo Rápido</SectionTitle>
@@ -380,6 +399,27 @@ function HomePage() {
           />
         </form>
       </QuickStartSection>
+
+      {showHowToPlay &&
+        <HowToPlaySection>
+          <SectionTitle>❓ Como Jogar</SectionTitle>
+          <p>Descubra a palavra secreta. Você pode tentar quantas vezes precisar.</p>
+          <p>As palavras foram ordenadas por um algoritmo de inteligência artificial de acordo com a similaridade delas com a palavra secreta.</p>
+          <p>Depois de enviar uma palavra, você verá a posição em que ela está. A palavra secreta é a número 1.</p>
+          <p>O algoritmo analisou milhares de textos em Português. Ele utiliza o contexto em que as palavras são utilizadas para calcular a similaridade entre elas.</p>
+          <button
+            style={{
+              color: 'var(--green)',
+              textDecoration: 'underline',
+              alignSelf: 'flex-end'
+            }}
+            onClick={() => {
+              localStorage.setItem('hasSeenHowToPlay', 'true')
+              setShowHowToPlay(false)
+            }}
+          >Já sei jogar 👍</button>
+        </HowToPlaySection>
+      }
 
       <CreateRoomSection>
         <SectionTitle>🎮 Criar Nova Sala</SectionTitle>
