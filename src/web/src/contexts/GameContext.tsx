@@ -3,6 +3,8 @@ import { io, Socket } from 'socket.io-client'
 import { gameApi, userApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
 
+const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
 interface CurrentGame {
   roomId: string
   gameId: string
@@ -74,7 +76,7 @@ function useGameHook() {
     if (!isInitialized) return
 
     console.log('Connecting socket...')
-    const newSocket = io('http://localhost:3001', {
+    const newSocket = io(socketUrl, {
       withCredentials: true, // This ensures cookies are sent
     })
 
