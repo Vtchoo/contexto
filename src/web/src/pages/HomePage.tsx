@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
@@ -13,6 +13,7 @@ const Container = styled.div`
   padding: 2rem;
   max-width: 800px;
   margin: 0 auto;
+  gap: 2rem;
 `
 
 const Title = styled.h1`
@@ -27,7 +28,7 @@ const Title = styled.h1`
 const Subtitle = styled.p`
   color: var(--secondary-text);
   font-size: 1.1rem;
-  margin-bottom: 3rem;
+  margin-bottom: 1rem;
   text-align: center;
   line-height: 1.6;
 `
@@ -37,7 +38,6 @@ const QuickStartSection = styled.div`
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 2rem;
-  margin-bottom: 2rem;
   box-shadow: 0 2px 8px var(--shadow);
 `
 
@@ -56,7 +56,6 @@ const QuickPlayInput = styled.input`
   font-size: 1rem;
   background: var(--input-bg);
   color: var(--text-color);
-  margin-bottom: 0.5rem;
   transition: border-color 0.2s ease;
 
   &:focus {
@@ -81,7 +80,6 @@ const CreateRoomSection = styled.div`
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 2rem;
-  margin-bottom: 2rem;
   box-shadow: 0 2px 8px var(--shadow);
 `
 
@@ -107,6 +105,30 @@ const ModeButton = styled.button<{ active: boolean }>`
   &:hover {
     border-color: var(--button-bg);
     transform: translateY(-1px);
+  }
+`
+
+const Button = styled.button`
+  width: 100%;
+  background: var(--green);
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+
+  &:hover:not(:disabled) {
+    background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  }
+
+  &:disabled {
+    background: var(--secondary-text);
+    cursor: not-allowed;
+    transform: none;
   }
 `
 
@@ -186,6 +208,36 @@ const JoinRoomButton = styled.button`
     background: var(--secondary-text);
     cursor: not-allowed;
     transform: none;
+  }
+`
+
+const EditUserSection = styled.div`
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px var(--shadow);
+  margin-bottom: 2rem;
+`
+
+const EditUserInput = styled.input`
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--input-bg);
+  color: var(--text-color);
+  margin-bottom: 1rem;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    border-color: var(--button-bg);
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--secondary-text);
   }
 `
 
@@ -350,7 +402,7 @@ function HomePage() {
         <CreateRoomButton onClick={handleCreateRoom} disabled={!isConnected || loading}>
           {loading ? 'Criando sala...' : 'Criar Sala'}
         </CreateRoomButton>
-        <CreateRoomButton style={{ marginTop: 12, background: '#2d72d9' }}
+        <CreateRoomButton style={{ marginTop: 12, backgroundColor: 'var(--card-background)', color: 'var(--green)', border: '1px solid var(--green)' }} // invert from the previous button
           onClick={() => setShowCustomModal(true)}
           disabled={!isConnected || loading}
         >
@@ -374,7 +426,24 @@ function HomePage() {
           </JoinRoomButton>
         </form>
       </JoinRoomSection>
-      
+
+      {/* <EditUserSection>
+        <SectionTitle>👤 Meu perfil</SectionTitle>
+        <form>
+          <label htmlFor="username">Nome de usuário</label>
+          <EditUserInput
+            type="text"
+            placeholder="Seu nome de usuário"
+            value={user?.username || ''}
+            onChange={(e) => setUser({ ...user, username: e.target.value })}
+            disabled={!isConnected || loading}
+          />
+          <Button type="submit" disabled={!isConnected || loading}>
+            Salvar
+          </Button>
+        </form>
+      </EditUserSection> */}
+
       {!isConnected && (
         <div style={{ 
           color: 'var(--secondary-text)', 
