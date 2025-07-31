@@ -223,16 +223,19 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
 
     getCurrentGameState(playerId: string): GameState {
         const playerGuesses = this.playerGuesses.get(playerId) || []
-        const otherPlayersGuesses = Object.entries(this.playerGuesses)
+        const otherPlayersGuesses = Array.from(this.playerGuesses.entries())
             .filter(([id]) => id !== playerId)
             .map(([id, guesses]) => guesses.reduce((acc, guess) => {
                 // get only the best guess for each player
-                if (!acc || (guess.distance !== undefined && guess.distance < acc.distance)) {
+                if (!acc)
                     return guess
-                }
+                if (!acc.distance)
+                    return guess
+                if ((guess.distance !== undefined && guess.distance < acc.distance))
+                    return guess
                 return acc
             }, null as Guess | null))
-            .filter(guess => guess !== null) // Filter out null guesses
+            .filter(guess => isNotNull(guess)) // Filter out null guesses
             .map(guess => ({
                 word: "",
                 distance: guess?.distance,
@@ -251,6 +254,10 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
             guesses: guesses,
         }
     }
+}
+
+function isNotNull<T>(value: T | null): value is T {
+    return value !== null
 }
 
 export { ContextoCompetitiveGame }
