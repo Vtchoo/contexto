@@ -4,6 +4,7 @@ import { UserManager } from '../UserManager'
 import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
+import { getTodaysGameId } from '../../utils/misc'
 
 // Extend Express Request interface
 declare global {
@@ -21,7 +22,8 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
   // Create a new game
   router.post('/', async (req: Request, res: Response) => {
     try {
-      const { type, gameId } = req.body
+      const { type, allowTips, allowGiveUp, maxPlayers } = req.body
+      let gameId: number | Date | 'random' | undefined = req.body.gameId
 
       if (!['default', 'competitive', 'battle-royale', 'stop'].includes(type)) {
         return res.status(400).json({ error: 'Invalid game type' })
@@ -35,6 +37,12 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
 
       if (!user) {
         return res.status(401).json({ error: 'User not found' })
+      }
+
+      if (gameId === 'random') {
+        const currentId = getTodaysGameId()
+        const randomId = Math.floor(Math.random() * currentId)
+        gameId = randomId
       }
 
       const roomId = gameManager.createGame(type, user.id, gameId)

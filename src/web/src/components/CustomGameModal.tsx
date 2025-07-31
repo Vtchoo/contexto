@@ -1,7 +1,8 @@
 
 import { GameMode } from '@/api/gameApi';
 import React, { useState, useRef, useEffect } from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
+import { getTodaysGameId } from '../../../utils/misc';
 
 interface CustomGameModalProps {
   isOpen: boolean;
@@ -11,8 +12,7 @@ interface CustomGameModalProps {
     allowTips: boolean;
     allowGiveUp: boolean;
     maxPlayers: number;
-    customGameId?: string;
-    customDate?: string;
+    gameId?: number | Date | 'random';
   }) => void;
 }
 
@@ -82,12 +82,16 @@ const Checkbox = styled.input`
   accent-color: var(--button-bg, #2d72d9);
 `;
 
-const Input = styled.input`
+const Input = styled.input<{ $invalid?: boolean }>`
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   border: 1.5px solid var(--border-color, #d1d5db);
   background: var(--input-bg, #f8f9fa);
   color: var(--text-color, #222);
+  ${({ $invalid }) => $invalid && css`
+    border-color: red;
+    background: rgba(255, 0, 0, 0.1);
+  `}
   width: 70px;
   font-size: 1rem;
 `;
@@ -121,14 +125,17 @@ const Button = styled.button`
   }
 `;
 
+interface GameIdSelection {
+  type: 'today' | 'id' | 'date' | 'random';
+  id?: number | Date | 'random';
+}
 
 export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClose, onCreate }) => {
   const [gameMode, setGameMode] = useState<GameMode>('default');
   const [allowTips, setAllowTips] = useState(true);
   const [allowGiveUp, setAllowGiveUp] = useState(true);
   const [maxPlayers, setMaxPlayers] = useState(8);
-  const [customGameId, setCustomGameId] = useState('');
-  const [customDate, setCustomDate] = useState('');
+  const [gameId, setGameId] = useState<GameIdSelection | undefined>({ type: 'today' });
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Open/close dialog imperatively
@@ -154,11 +161,6 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
     return () => dialog.removeEventListener('cancel', handleCancel);
   }, [onClose]);
 
-  const handleRandomId = () => {
-    // Simple random string (could use snowflake or uuid if available)
-    setCustomGameId(Math.random().toString(36).slice(2, 10).toUpperCase());
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onCreate({
@@ -166,8 +168,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
       allowTips,
       allowGiveUp,
       maxPlayers,
-      customGameId: customGameId.trim() || undefined,
-      customDate: customDate.trim() || undefined,
+      gameId: gameId?.id
     });
   };
 
@@ -214,27 +215,35 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
             />
           </Row>
           <Row>
-            <Label htmlFor="customGameId">ID da Sala</Label>
-            <Input
-              id="customGameId"
-              type="text"
-              placeholder="(opcional)"
-              value={customGameId}
-              onChange={e => setCustomGameId(e.target.value.toUpperCase())}
-              style={{ width: 120 }}
-            />
-            <Button type="button" style={{ minWidth: 0, padding: '0.4rem 0.7rem' }} onClick={handleRandomId}>Aleatório</Button>
+            <Button type="button" data-variant={gameId?.type !== "today" ? "cancel" : undefined} onClick={() => setGameId({ type: 'today' })}>Jogo de hoje</Button>
+            <Button type="button" data-variant={gameId?.type !== "id" ? "cancel" : undefined} onClick={() => setGameId({ type: 'id' })}>ID</Button>
+            <Button type="button" data-variant={gameId?.type !== "date" ? "cancel" : undefined} onClick={() => setGameId({ type: 'date' })}>Data</Button>
+            <Button type="button" data-variant={gameId?.type !== "random" ? "cancel" : undefined} onClick={() => setGameId({ type: 'random', id: 'random' })}>Aleatório</Button>
           </Row>
-          <Row>
-            <Label htmlFor="customDate">Data</Label>
-            <Input
-              id="customDate"
-              type="date"
-              value={customDate}
-              onChange={e => setCustomDate(e.target.value)}
-              style={{ width: 160 }}
-            />
-          </Row>
+          {gameId && (
+            <Row style={{ justifyContent: 'center' }}>
+              {gameId.type === 'id' && (
+                <Input
+                  type="number"
+                  placeholder="Digite o ID"
+                  value={gameId.id?.toString() || ''}
+                  onChange={e => setGameId({ ...gameId, id: Number(e.target.value) })}
+                  style={{ width: 120 }}
+                  max={getTodaysGameId()}
+                  $invalid={Number(gameId.id) > getTodaysGameId()}
+                />
+              )}
+              {gameId.type === 'date' && (
+                <Input
+                  type="date"
+                  value={gameId.id?.toISOString().split('T')[0] || ''}
+                  onChange={e => setGameId({ ...gameId, id: new Date(e.target.value) })}
+                  style={{ width: 160 }}
+                  $invalid={new Date(gameId.id).getTime() > new Date().getTime()}
+                />
+              )}
+            </Row>
+          )}
           <ButtonRow>
             <Button type="button" data-variant="cancel" onClick={onClose}>Cancelar</Button>
             <Button type="submit">Criar</Button>

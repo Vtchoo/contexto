@@ -262,10 +262,11 @@ function HomePage() {
     allowTips: boolean;
     allowGiveUp: boolean;
     maxPlayers: number;
+    gameId?: number | Date | 'random';
   }) => {
     setCustomGameLoading(true)
     try {
-      await createGame(options.gameMode)
+      await createGame(options.gameMode, options)
       setShowDemo(true)
       setShowCustomModal(false)
       // TODO: Pass allowTips, allowGiveUp, maxPlayers to backend if supported
