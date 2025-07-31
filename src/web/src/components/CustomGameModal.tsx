@@ -1,6 +1,6 @@
 
 import { GameMode } from '@/api/gameApi';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import styled, { css, keyframes } from 'styled-components';
 import { getTodaysGameId } from '../../../utils/misc';
 
@@ -123,6 +123,10 @@ const Button = styled.button`
       background: #ddd;
     }
   }
+  &:disabled {
+    background: var(--disabled-bg, #ccc);
+    cursor: not-allowed;
+  }
 `;
 
 interface GameIdSelection {
@@ -130,11 +134,28 @@ interface GameIdSelection {
   id?: number | Date | 'random';
 }
 
+const predefinedRules = {
+  'default': {
+  },
+  'competitive': {
+    allowTips: false,
+    allowGiveUp: false,
+  },
+  'stop': {
+    allowTips: false,
+    allowGiveUp: false,
+  },
+  'battle-royale': {
+    allowTips: false,
+    allowGiveUp: false,
+  },
+} as const;
+
 export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClose, onCreate }) => {
   const [gameMode, setGameMode] = useState<GameMode>('default');
   const [allowTips, setAllowTips] = useState(true);
   const [allowGiveUp, setAllowGiveUp] = useState(true);
-  const [maxPlayers, setMaxPlayers] = useState(8);
+  const [maxPlayers, setMaxPlayers] = useState(10);
   const [gameId, setGameId] = useState<GameIdSelection | undefined>({ type: 'today' });
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -172,17 +193,44 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
     });
   };
 
+  function handleSetGameMode(mode: GameMode) {
+    setGameMode(mode);
+    const rules = predefinedRules[mode];
+    if (rules) {
+      if ("allowTips" in rules)
+        setAllowTips(rules.allowTips);
+      if ("allowGiveUp" in rules)
+        setAllowGiveUp(rules.allowGiveUp);
+    }
+  }
+
+  const selectedPredefinedRules = predefinedRules[gameMode];
+
+  const gameIsValid = useMemo(() => {
+    // check if set game id is valid
+    if (!gameId) return true;
+    if (gameId.type === 'id' && gameId.id !== undefined) {
+      const id = Number(gameId.id);
+      return id > 0 && id <= getTodaysGameId();
+    }
+    if (gameId.type === 'date' && gameId.id instanceof Date) {
+      const date = gameId.id;
+      return date.getTime() <= new Date().getTime();
+    }
+    return true;
+  }, [gameId]);
+
   return (
     <StyledDialog ref={dialogRef} aria-modal="true">
       <ModalContent>
         <form onSubmit={handleSubmit}>
           <Row>
             <Label htmlFor="gameMode">Modo de Jogo</Label>
-            <Select id="gameMode" value={gameMode} onChange={e => setGameMode(e.target.value as GameMode)}>
+            <Select id="gameMode" value={gameMode} onChange={e => handleSetGameMode(e.target.value as GameMode)}>
               <option value="default">Clássico</option>
               <option value="competitive">Competitivo</option>
-              <option value="battle-royale">Battle Royale</option>
               <option value="stop">Stop</option>
+              <option value="battle-royale">Battle Royale</option>
             </Select>
           </Row>
           <Row>
@@ -192,6 +240,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
               type="checkbox"
               checked={allowTips}
               onChange={e => setAllowTips(e.target.checked)}
+              disabled={"allowTips" in selectedPredefinedRules}
             />
           </Row>
           <Row>
@@ -201,6 +250,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
               type="checkbox"
               checked={allowGiveUp}
               onChange={e => setAllowGiveUp(e.target.checked)}
+              disabled={"allowGiveUp" in selectedPredefinedRules}
             />
           </Row>
           <Row>
@@ -228,7 +278,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
                   placeholder="Digite o ID"
                   value={gameId.id?.toString() || ''}
                   onChange={e => setGameId({ ...gameId, id: Number(e.target.value) })}
-                  style={{ width: 120 }}
+                  style={{ width: "100%" }}
                   max={getTodaysGameId()}
                   $invalid={Number(gameId.id) > getTodaysGameId()}
                 />
@@ -238,7 +288,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
                   type="date"
                   value={gameId.id?.toISOString().split('T')[0] || ''}
                   onChange={e => setGameId({ ...gameId, id: new Date(e.target.value) })}
-                  style={{ width: 160 }}
+                  style={{ width: "100%" }}
                   $invalid={new Date(gameId.id).getTime() > new Date().getTime()}
                 />
               )}
@@ -246,7 +296,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
           )}
           <ButtonRow>
             <Button type="button" data-variant="cancel" onClick={onClose}>Cancelar</Button>
-            <Button type="submit">Criar</Button>
+            <Button type="submit" disabled={!gameIsValid}>Criar</Button>
           </ButtonRow>
         </form>
       </ModalContent>
