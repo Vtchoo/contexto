@@ -12,6 +12,9 @@ const api = axios.create({
 })
 
 // Types
+
+export type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
+
 export interface Player {
   id: string
   username?: string
