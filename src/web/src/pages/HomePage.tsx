@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
 import { useGame } from '../contexts/GameContext'
+import CustomGameModal from '../components/CustomGameModal'
 
 const Container = styled.div`
   display: flex;
@@ -201,6 +202,8 @@ function HomePage() {
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
   const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess, startGame, user } = useGame()
+  const [showCustomModal, setShowCustomModal] = useState(false)
+  const [customGameLoading, setCustomGameLoading] = useState(false)
 
   // Handle URL room parameter
   useEffect(() => {
@@ -252,6 +255,25 @@ function HomePage() {
       setShowDemo(true)
     } catch (error) {
       console.error('Failed to join room:', error)
+    }
+  }
+
+  const handleCustomGameCreate = async (options: {
+    gameMode: string;
+    allowTips: boolean;
+    allowGiveUp: boolean;
+    maxPlayers: number;
+  }) => {
+    setCustomGameLoading(true)
+    try {
+      await createGame(options.gameMode)
+      setShowDemo(true)
+      setShowCustomModal(false)
+      // TODO: Pass allowTips, allowGiveUp, maxPlayers to backend if supported
+    } catch (error) {
+      console.error('Failed to create custom game:', error)
+    } finally {
+      setCustomGameLoading(false)
     }
   }
 
@@ -328,6 +350,12 @@ function HomePage() {
         <CreateRoomButton onClick={handleCreateRoom} disabled={!isConnected || loading}>
           {loading ? 'Criando sala...' : 'Criar Sala'}
         </CreateRoomButton>
+        <CreateRoomButton style={{ marginTop: 12, background: '#2d72d9' }}
+          onClick={() => setShowCustomModal(true)}
+          disabled={!isConnected || loading}
+        >
+          {customGameLoading ? 'Criando personalizada...' : 'Personalizar Sala'}
+        </CreateRoomButton>
       </CreateRoomSection>
 
       <JoinRoomSection>
@@ -357,6 +385,12 @@ function HomePage() {
           Conectando ao servidor...
         </div>
       )}
+
+      <CustomGameModal
+        isOpen={showCustomModal}
+        onClose={() => setShowCustomModal(false)}
+        onCreate={handleCustomGameCreate}
+      />
     </Container>
   )
 }
