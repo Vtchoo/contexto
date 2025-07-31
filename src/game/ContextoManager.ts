@@ -36,14 +36,19 @@ class ContextoManager {
 
     public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default', gameIdOrDate?: number | Date) {
         let game: IGame
-        if (gameType === 'competitive') {
-            game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
-        } else if (gameType === 'stop') {
-            game = new ContextoStopGame(playerId, this, gameIdOrDate)
-        } else if (gameType === 'battle-royale') {
-            game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
-        } else {
-            game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
+        switch (gameType) {
+            case 'competitive':
+                game = new ContextoCompetitiveGame(playerId, this, gameIdOrDate)
+                break
+            case 'stop':
+                game = new ContextoStopGame(playerId, this, gameIdOrDate)
+                break
+            case 'battle-royale':
+                game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
+                break
+            case 'default':
+            default:
+                game = new ContextoDefaultGame(playerId, this, gameIdOrDate)
         }
 
         if (!game)
