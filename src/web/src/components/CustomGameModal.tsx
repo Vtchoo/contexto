@@ -1,4 +1,5 @@
 
+import { GameMode } from '@/api/gameApi';
 import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 
@@ -6,7 +7,7 @@ interface CustomGameModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (options: {
-    gameMode: string;
+    gameMode: GameMode;
     allowTips: boolean;
     allowGiveUp: boolean;
     maxPlayers: number;
@@ -38,10 +39,10 @@ const StyledDialog = styled.dialog`
     background: rgba(0,0,0,0.5);
     z-index: 1000;
   }
-  @keyframes fadeIn {
+  /* @keyframes fadeIn {
     from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); }
     to { opacity: 1; transform: translate(-50%, -50%); }
-  }
+  } */
 `;
 
 const ModalContent = styled.div`
@@ -121,7 +122,7 @@ const Button = styled.button`
 
 
 export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClose, onCreate }) => {
-  const [gameMode, setGameMode] = useState('default');
+  const [gameMode, setGameMode] = useState<GameMode>('default');
   const [allowTips, setAllowTips] = useState(true);
   const [allowGiveUp, setAllowGiveUp] = useState(true);
   const [maxPlayers, setMaxPlayers] = useState(8);
@@ -175,7 +176,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
         <form onSubmit={handleSubmit}>
           <Row>
             <Label htmlFor="gameMode">Modo de Jogo</Label>
-            <Select id="gameMode" value={gameMode} onChange={e => setGameMode(e.target.value)}>
+            <Select id="gameMode" value={gameMode} onChange={e => setGameMode(e.target.value as GameMode)}>
               <option value="default">Clássico</option>
               <option value="competitive">Competitivo</option>
               <option value="battle-royale">Battle Royale</option>

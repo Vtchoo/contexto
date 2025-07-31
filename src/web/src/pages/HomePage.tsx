@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
 import { useGame } from '../contexts/GameContext'
 import CustomGameModal from '../components/CustomGameModal'
+import { GameMode } from '@/api/gameApi'
 
 const Container = styled.div`
   display: flex;
@@ -193,8 +194,6 @@ const DemoGame = styled.div`
   max-width: 600px;
 `
 
-type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
-
 function HomePage() {
   const [selectedMode, setSelectedMode] = useState<GameMode>('default')
   const [showDemo, setShowDemo] = useState(false)
@@ -259,7 +258,7 @@ function HomePage() {
   }
 
   const handleCustomGameCreate = async (options: {
-    gameMode: string;
+    gameMode: GameMode;
     allowTips: boolean;
     allowGiveUp: boolean;
     maxPlayers: number;
