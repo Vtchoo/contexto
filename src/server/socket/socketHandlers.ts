@@ -6,6 +6,7 @@ import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
 import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from '../../game'
 import { IGame } from '../../game/interface'
+import * as zod from 'zod'
 
 interface SocketUser {
   token: string
@@ -16,15 +17,15 @@ interface SocketUser {
 // 'default' | 'competitive' | 'battle-royale' | 'stop'
 const getGameMode = (game: IGame): string => {
 	if (game instanceof ContextoDefaultGame) {
-		return 'default';
+		return 'default'
 	} else if (game instanceof ContextoCompetitiveGame) {
-		return 'competitive';
+		return 'competitive'
 	} else if (game instanceof ContextoBattleRoyaleGame) {
-		return 'battle-royale';
+		return 'battle-royale'
 	} else if (game instanceof ContextoStopGame) {
-		return 'stop';
+		return 'stop'
 	}
-	return 'default';
+	return 'default'
 }
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
@@ -348,6 +349,41 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           closestGuesses,
           count: closestGuesses.length
         })
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // Listen for player info updates (e.g., username change)
+    socket.on('update_player', async (data: { fields: Partial<Player> }) => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const player = await userManager.getUserById(socketUser.userId)
+        const currentRoom = player ? userManager.getUserCurrentRoom(player.id) : null
+        if (!player || !currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        // Only allow editable fields (currently username)
+        const fields: Partial<Player> = zod.object({
+          username: zod.string().optional(),
+          avatarUrl: zod.string().url().optional(),
+          // Add other fields as needed
+        }).parse(data.fields)
+
+        await userManager.updatePlayer(player.id, fields)
+        // Notify all players in the room about the update
+        io.to(currentRoom).emit('player_updated', {
+          id: player.id,
+          username: player.username,
+          // Add more fields as needed
+        })
+        socket.emit('player_update_success', { player })
       } catch (error: any) {
         socket.emit('error', { error: error.message })
       }

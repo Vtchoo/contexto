@@ -69,6 +69,20 @@ export function setupUserRoutes(userManager: UserManager) {
 		}
 	});
 
+	// Get user by ID
+	router.get('/:userId', async (req, res) => {
+		try {
+			const { userId } = req.params
+			const user = await userManager.getUserById(userId)
+			if (!user) {
+				return res.status(404).json({ error: 'User not found' })
+			}
+			res.json(user)
+		} catch (error: any) {
+			res.status(500).json({ error: error.message })
+		}
+	})
+
 	// Generate anonymous username
 	// router.post('/username/anonymous', async (req: Request, res: Response) => {
 	// 	try {

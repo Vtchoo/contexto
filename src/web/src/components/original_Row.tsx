@@ -1,3 +1,4 @@
+import { useGame } from '@/contexts/GameContext';
 import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '../../../utils/misc';
 import { PlayerAvatar } from './PlayerAvatar';
 
@@ -38,6 +39,8 @@ interface RowProps {
 
 function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps) {
 
+	const { getPlayerById } = useGame()
+
 	const displayWord = hidden ? `@${addedBy}` : word;
 	console.log({ word, distance, highlight, hidden, addedBy });
 	return (
@@ -55,7 +58,7 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps)
 				<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
 					{displayWord}
 					{addedBy && (addedBy !== playerId) && (
-						<PlayerAvatar id={addedBy} size={24} transparent />
+						<PlayerAvatar id={addedBy} username={getPlayerById(addedBy)?.username} size={24} transparent />
 					)}
 				</div>
 				<span>{distance + 1}</span>

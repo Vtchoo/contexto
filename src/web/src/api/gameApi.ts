@@ -142,6 +142,11 @@ export const userApi = {
     return response.data
   },
 
+  getPlayerById: async (userId: string): Promise<Player> => {
+    const response = await api.get(`/api/users/${userId}`)
+    return response.data
+  },
+
   // Update any user field(s)
   updateUser: async (fields: Partial<Player>) => {
     // PUT /api/users/me with any editable fields

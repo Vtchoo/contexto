@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { gameApi, userApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
+import { useCache } from '@/hooks/useCache'
 
 const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -24,6 +25,9 @@ function useGameHook() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // const [playersCache, setPlayersCache] = useState<Map<string, Player>>(new Map())
+  const { get: getPlayerFromCache, add: addToPlayerCache } = useCache(async (playerId: string) => userApi.getPlayerById(playerId))
   
   // Use ref to track if initialization is in progress to prevent race conditions
   const initializationInProgress = useRef(false)
@@ -59,7 +63,7 @@ function useGameHook() {
 
   useEffect(() => {
     if (!user)
-      return;
+      return
     
     connect()
 
@@ -91,7 +95,7 @@ function useGameHook() {
       console.log('Socket disconnected', reason)
     })
 
-    newSocket.on('room_joined', (data) => {
+    newSocket.on('room_joined', async (data) => {
       console.log('Room joined event:', data) // Debug log
       setCurrentGame(prev => {
         const newGame = {
@@ -107,6 +111,14 @@ function useGameHook() {
         console.log('Setting currentGame to:', newGame) // Debug log
         return newGame
       })
+      // const players = await getPlayersById(data.players || [])
+      // setPlayersCache(prevCache => {
+      //   const updatedCache = new Map(prevCache)
+      //   players.forEach(player => {
+      //     updatedCache.set(player.id, player)
+      //   })
+      //   return updatedCache
+      // })
     })
 
     newSocket.on('room_left', () => {
@@ -181,8 +193,7 @@ function useGameHook() {
     // Listen for new player joining the room
     newSocket.on('player_joined', (data) => {
       setCurrentGame(prev => {
-        alert(`Novo jogador entrou: ${data.userId}`) // Debug log
-        if (!prev) return null;
+        if (!prev) return null
         // Update players list if provided
         // {
         //   userId: socketUser.userId,
@@ -191,21 +202,41 @@ function useGameHook() {
         return {
           ...prev,
           players: [...(prev.players || []), data.userId],
-        };
-      });
-    });
+        }
+      })
+      // getPlayersById([data.userId]).then(players => {
+      //   players.forEach(player => {
+      //     setPlayersCache(prevCache => new Map(prevCache).set(player.id, player))
+      //   })
+      // })
+    })
 
     // Listen for player leaving the room
     newSocket.on('player_left', (data) => {
       setCurrentGame(prev => {
-        if (!prev) return null;
+        if (!prev) return null
         // Remove the player from the list
         return {
           ...prev,
           players: (prev.players || []).filter(id => id !== data.userId),
-        };
-      });
-    });
+        }
+      })
+    })
+
+    newSocket.on('player_updated', (data) => {
+      // setPlayersCache(prev => {
+      //   const updatedCache = new Map(prev)
+      //   updatedCache.set(data.id, {
+      //     ...updatedCache.get(data.id),
+      //     ...data
+      //   })
+      //   return updatedCache
+      // })
+      addToPlayerCache(data.id, {
+        // ...getPlayerFromCache(data.id),
+        ...data
+      })
+    })
 
     newSocket.on('error', (data) => {
       setError(data.error)
@@ -352,6 +383,13 @@ function useGameHook() {
     return () => disconnect()
   }, [])
 
+  function getPlayerById(id: string): Player | undefined {
+    const player = getPlayerFromCache(id)
+    if (player.value) {
+      return player.value
+    }
+  }
+
   return {
     user,
     socket,
@@ -369,6 +407,7 @@ function useGameHook() {
     makeGuess,
     startGame,
     clearError,
+    getPlayerById,
   }
 }
 

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import Row from './original_Row'
-import { PlayerAvatar } from './PlayerAvatar';
+import { PlayerAvatar } from './PlayerAvatar'
 import { strings } from '../constants/strings'
 import { Player } from '@/api/gameApi'
+import { useGame } from '@/contexts/GameContext'
 
 interface Guess {
   word: string
@@ -44,6 +45,8 @@ function GameInterface({
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const { getPlayerById } = useGame()
 
   const getGameModeDisplayName = (mode: string | null) => {
     const modeNames = {
@@ -313,7 +316,7 @@ function GameInterface({
           <div className="player-list" style={{ paddingBlock: '1rem' }}>
             <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
               {players.map(playerId => (
-                <PlayerAvatar key={playerId} id={playerId} size={36} />
+                <PlayerAvatar key={playerId} id={playerId} username={getPlayerById(playerId)?.username} size={36} />
               ))}
             </ul>
           </div>
