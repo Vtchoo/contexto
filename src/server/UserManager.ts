@@ -121,36 +121,24 @@ export class UserManager {
     return null
   }
 
-  async setUsername(tokenOrId: string, username: string): Promise<boolean> {
+  async updatePlayer(id: string, data: Partial<Player>): Promise<boolean> {
     // Try to get user by ID first, then by parsing token
-    let user = await this.getUserById(tokenOrId)
-    if (!user) {
-      const userId = this.getUserIdFromToken(tokenOrId)
-      if (userId) {
-        user = await this.getUserById(userId)
-      }
-    }
+    const player = await this.getUserById(id)
     
-    if (!user) return false
+    if (!player) return false
 
-    // Check if username is already taken
-    const existingUser = await this.getUserByUsername(username)
-    if (existingUser && existingUser.id !== user.id) {
-      return false
+    // Update user fields
+    Object.assign(player, data)
+
+    // Update memory cache
+    this.users.set(player.id, player)
+    if (player.username) {
+      this.usersByUsername.set(player.username, player)
     }
-
-    // Remove old username mapping if exists
-    if (user.username) {
-      this.usersByUsername.delete(user.username)
-    }
-
-    // Set new username
-    user.setUsername(username)
-    this.usersByUsername.set(username, user)
 
     // Save to database
     try {
-      await this.userRepository.save(user)
+      await this.userRepository.save(player)
     } catch (error) {
       console.error('Failed to save user to database:', error)
     }

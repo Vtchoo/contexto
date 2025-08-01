@@ -468,7 +468,7 @@ function HomePage() {
         </form>
       </JoinRoomSection>
 
-      {/* <EditUserSection>
+      <EditUserSection>
         <SectionTitle>👤 Meu perfil</SectionTitle>
         <form>
           <label htmlFor="username">Nome de usuário</label>
@@ -483,7 +483,7 @@ function HomePage() {
             Salvar
           </Button>
         </form>
-      </EditUserSection> */}
+      </EditUserSection>
 
       {!isConnected && (
         <div style={{ 

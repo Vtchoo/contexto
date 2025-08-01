@@ -142,8 +142,10 @@ export const userApi = {
     return response.data
   },
 
-  setUsername: async (username: string) => {
-    const response = await api.post('/api/users/username', { username })
+  // Update any user field(s)
+  updateUser: async (fields: Partial<Player>) => {
+    // PUT /api/users/me with any editable fields
+    const response = await api.put('/api/users/me', fields)
     return response.data
   },
 
