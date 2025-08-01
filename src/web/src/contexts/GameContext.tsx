@@ -238,6 +238,20 @@ function useGameHook() {
       })
     })
 
+    newSocket.on('player_update_success', (data) => {
+      setUser(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          ...data
+        }
+      })
+      // Update player in cache
+      addToPlayerCache(data.id, {
+        ...data.player
+      })
+    })
+
     newSocket.on('error', (data) => {
       setError(data.error)
     })
@@ -373,6 +387,31 @@ function useGameHook() {
     socket.emit('start_game')
   }
 
+  const updatePlayer = async (playerInfo: Partial<Player>) => {
+    if (!isInitialized || !socket || !isConnected) {
+      setError('Aplicação não foi inicializada ou socket não conectado')
+      return
+    }
+
+    socket.emit('update_player', playerInfo)
+
+    // try {
+    //   const updatedPlayer = await userApi.updateUser(playerInfo)
+    //   setUser(updatedPlayer)
+
+    //   // Update player in cache
+    //   addToPlayerCache(updatedPlayer.id, updatedPlayer)
+
+    //   // Emit event to update player info in other clients
+    //   if (socket.connected) {
+    //     socket.emit('update_player', updatedPlayer)
+    //   }
+    // } catch (err) {
+    //   setError('Falha ao atualizar usuário')
+    //   throw err
+    // }
+  }
+
   const clearError = () => {
     setError(null)
   }
@@ -408,6 +447,7 @@ function useGameHook() {
     startGame,
     clearError,
     getPlayerById,
+    updatePlayer,
   }
 }
 

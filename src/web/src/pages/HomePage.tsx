@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
 import { useGame } from '../contexts/GameContext'
 import CustomGameModal from '../components/CustomGameModal'
-import { GameMode } from '@/api/gameApi'
+import { GameMode, Player } from '@/api/gameApi'
 
 const Container = styled.div`
   display: flex;
@@ -263,9 +263,10 @@ function HomePage() {
   const [quickPlayWord, setQuickPlayWord] = useState('')
   const [roomIdInput, setRoomIdInput] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess, startGame, user } = useGame()
+  const { createGame, quickPlay, joinRoom, currentGame, loading, isConnected, makeGuess, startGame, user, updatePlayer } = useGame()
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [customGameLoading, setCustomGameLoading] = useState(false)
+  const [playerInfo, setPlayerInfo] = useState<Partial<Player> | null>(null)
 
   const [showHowToPlay, setShowHowToPlay] = useState(false)
   useEffect(() => {
@@ -470,13 +471,18 @@ function HomePage() {
 
       <EditUserSection>
         <SectionTitle>👤 Meu perfil</SectionTitle>
-        <form>
+        <form onSubmit={async (e) => {
+          e.preventDefault()
+          if (!playerInfo)
+            return
+          await updatePlayer(playerInfo)
+        }}>
           <label htmlFor="username">Nome de usuário</label>
           <EditUserInput
             type="text"
             placeholder="Seu nome de usuário"
-            value={user?.username || ''}
-            onChange={(e) => setUser({ ...user, username: e.target.value })}
+            value={playerInfo?.username || ''}
+            onChange={(e) => setPlayerInfo({ ...playerInfo, username: e.target.value })}
             disabled={!isConnected || loading}
           />
           <Button type="submit" disabled={!isConnected || loading}>
