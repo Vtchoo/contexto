@@ -355,7 +355,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     })
 
     // Listen for player info updates (e.g., username change)
-    socket.on('update_player', async (data: { fields: Partial<Player> }) => {
+    socket.on('update_player', async (data: Partial<Player>) => {
       try {
         if (!socketUser) {
           socket.emit('error', { error: 'Not authenticated' })
@@ -363,28 +363,41 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         const player = await userManager.getUserById(socketUser.userId)
-        const currentRoom = player ? userManager.getUserCurrentRoom(player.id) : null
-        if (!player || !currentRoom) {
-          socket.emit('error', { error: 'Not in a room' })
+        if (!player) {
+          socket.emit('error', { error: 'Player not found' })
           return
         }
 
-        // Only allow editable fields (currently username)
-        const fields: Partial<Player> = zod.object({
-          username: zod.string().optional(),
-          avatarUrl: zod.string().url().optional(),
-          // Add other fields as needed
-        }).parse(data.fields)
-
+        let fields: Partial<Player>
+        try {
+          // Only allow editable fields (currently username)
+          fields = zod.object({
+            username: zod.string().optional(),
+            avatarUrl: zod.string().url().optional(),
+            // Add other fields as needed
+          }).parse(data)
+        } catch (error: any) {
+          socket.emit('error', { error: 'Invalid data format' })
+          return
+        }
+        
         await userManager.updatePlayer(player.id, fields)
-        // Notify all players in the room about the update
-        io.to(currentRoom).emit('player_updated', {
-          id: player.id,
-          username: player.username,
-          // Add more fields as needed
-        })
+        
+        console.log(`✅ User ${player.id} updated info:`, fields)
         socket.emit('player_update_success', { player })
+        // Notify all players in the room about the update
+        const currentRoom = player ? userManager.getUserCurrentRoom(player.id) : null
+        if (currentRoom) {
+          io.to(currentRoom).emit('player_updated', {
+            id: player.id,
+            username: player.username,
+            // Add more fields as needed
+          })
+          console.log(`🔄 User ${player.id} updated info in room ${currentRoom}:`, fields)
+          return
+        }
       } catch (error: any) {
+        console.error(`❌ Error updating player ${socketUser?.userId}:`, error.message)
         socket.emit('error', { error: error.message })
       }
     })
