@@ -1,18 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 
 export type CacheResult<Type> =
     | { status: "loaded", value: Type }
     | { status: "loading", value?: undefined }
     | { status: "error", error: Error, value?: undefined }
-  
-type CacheEntry<Type> = { value?: Type, error?: Error, loading?: boolean };
 
 function useCache<Key, Type>(func: (key: Key) => Promise<Type>) {
 
     const [cache, setCache] = useState<Map<Key, CacheResult<Type>>>(new Map())
+    const loadingKeysRef = useRef<Set<Key>>(new Set())
 
     function isLoading(key: Key) {
-        return cache.get(key)?.status === 'loading' || false
+        return loadingKeysRef.current.has(key) || cache.get(key)?.status === 'loading' || false
     }
 
     function addToCache(key: Key, value: Type) {
@@ -26,6 +25,9 @@ function useCache<Key, Type>(func: (key: Key) => Promise<Type>) {
     async function loadValue(key: Key) {
         if (isLoading(key)) return
 
+        // Mark as loading in ref to prevent multiple requests in same render
+        loadingKeysRef.current.add(key)
+
         setCache(prev => new Map(prev).set(key, {
             status: 'loading'
         }))
@@ -35,6 +37,9 @@ function useCache<Key, Type>(func: (key: Key) => Promise<Type>) {
             setCache(prev => new Map(prev).set(key, { value, status: 'loaded' }))
         } catch (error: any) {
             setCache(prev => new Map(prev).set(key, { status: 'error', error: error }))
+        } finally {
+            // Remove from loading set when done
+            loadingKeysRef.current.delete(key)
         }
     }
 
