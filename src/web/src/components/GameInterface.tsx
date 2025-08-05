@@ -13,6 +13,15 @@ interface Guess {
   hidden?: boolean // For multiplayer, to hide guesses until revealed
 }
 
+interface PlayerDisplayData {
+  playerId: string
+  username?: string
+  isOnline: boolean
+  transparent: boolean
+  numberBadge?: number
+  medalPosition?: 1 | 2 | 3
+}
+
 interface GameInterfaceProps {
   gameId?: number
   roomId?: string
@@ -48,6 +57,84 @@ function GameInterface({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { getPlayerById, currentGame: gameContext } = useGame()
+
+  // Calculate player display data for the player list
+  const playerDisplayData = useMemo((): PlayerDisplayData[] => {
+    // Get all unique players who have made guesses (exclude error guesses)
+    const playersWithGuesses = [...new Set(guesses
+      .filter(guess => guess.addedBy && !guess.error)
+      .map(guess => guess.addedBy!))]
+    
+    // Combine current players with players who have made guesses
+    const allRelevantPlayers = [...new Set([...players, ...playersWithGuesses])]
+    
+    // Only process if there are multiple players
+    if (allRelevantPlayers.length <= 1) {
+      return []
+    }
+
+    const ranking = gameContext?.ranking || []
+
+    return allRelevantPlayers.map((playerId) => {
+      const playerRanking = ranking.find(r => r.playerId === playerId)
+      const isPlayerOnline = players.includes(playerId)
+      const hasPlayerMadeGuesses = playersWithGuesses.includes(playerId)
+      
+      // Calculate badges based on game mode and rules
+      let medalPosition: 1 | 2 | 3 | undefined
+      let numberBadge: number | undefined
+      
+      if (gameMode === 'default') {
+        // Coop: number of guesses, no medal
+        const playerGuesses = guesses.filter(g => g.addedBy === playerId && !g.error)
+        numberBadge = playerGuesses.length
+      } else if (gameMode === 'competitive') {
+        // Competitive: number of guesses, medal for less guesses (must have won)
+        // Use ranking data for guess count since guesses list only shows closest guess
+        numberBadge = playerRanking?.guessCount || 0
+        
+        // Show medal only if player has won (closestDistance is 0)
+        if (playerRanking?.closestDistance === 0) {
+          // Sort completed players by guess count, then by completion time
+          const completedPlayers = ranking
+            .filter(r => r.closestDistance === 0)
+            .sort((a, b) => {
+              if (a.guessCount !== b.guessCount) {
+                return a.guessCount - b.guessCount
+              }
+              return (a.completedAt?.getTime() || 0) - (b.completedAt?.getTime() || 0)
+            })
+          
+          const position = completedPlayers.findIndex(r => r.playerId === playerId) + 1
+          if (position <= 3) {
+            medalPosition = position as 1 | 2 | 3
+          }
+        }
+      } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
+        // Stop/Battle Royale: closest distance, medal for closest guess
+        numberBadge = playerRanking?.closestDistance
+        
+        // Sort players by closest distance for medal positions
+        const sortedByDistance = ranking
+          .filter(r => r.closestDistance !== undefined)
+          .sort((a, b) => (a.closestDistance || 0) - (b.closestDistance || 0))
+        
+        const position = sortedByDistance.findIndex(r => r.playerId === playerId) + 1
+        if (position <= 3) {
+          medalPosition = position as 1 | 2 | 3
+        }
+      }
+      
+      return {
+        playerId,
+        username: getPlayerById(playerId)?.username,
+        isOnline: isPlayerOnline,
+        transparent: !isPlayerOnline && hasPlayerMadeGuesses,
+        numberBadge,
+        medalPosition
+      }
+    })
+  }, [guesses, players, gameMode, gameContext?.ranking, getPlayerById])
 
   const getGameModeDisplayName = (mode: string | null) => {
     const modeNames = {
@@ -332,94 +419,24 @@ function GameInterface({
 
         {message}
 
-        {/* Show all players who have participated in the game (made guesses) */}
-        {(() => {
-          // Get all unique players who have made guesses (exclude error guesses)
-          const playersWithGuesses = [...new Set(guesses
-            .filter(guess => guess.addedBy && !guess.error)
-            .map(guess => guess.addedBy!))]
-          
-          // Combine current players with players who have made guesses
-          const allRelevantPlayers = [...new Set([...players, ...playersWithGuesses])]
-          
-          // Only show player list if there are multiple players
-          if (allRelevantPlayers.length > 1) {
-            return (
-              <div className="player-list" style={{ paddingBlock: '1rem' }}>
-                <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
-                  {allRelevantPlayers.map((playerId) => {
-                    const ranking = gameContext?.ranking || [];
-                    const playerRanking = ranking.find(r => r.playerId === playerId);
-                    
-                    // Check if player is still in the current game (online)
-                    const isPlayerOnline = players.includes(playerId);
-                    
-                    // Check if player has made any guesses
-                    const hasPlayerMadeGuesses = playersWithGuesses.includes(playerId);
-                    
-                    // Calculate badges based on game mode and rules
-                    let medalPosition: 1 | 2 | 3 | undefined;
-                    let numberBadge: number | undefined;
-                    
-                    if (gameMode === 'default') {
-                      // Coop: number of guesses, no medal
-                      const playerGuesses = guesses.filter(g => g.addedBy === playerId && !g.error);
-                      numberBadge = playerGuesses.length;
-                    } else if (gameMode === 'competitive') {
-                      // Competitive: number of guesses, medal for less guesses (must have won)
-                      // Use ranking data for guess count since guesses list only shows closest guess
-                      numberBadge = playerRanking?.guessCount || 0;
-                      
-                      // Show medal only if player has won (closestDistance is 0)
-                      if (playerRanking?.closestDistance === 0) {
-                        // Sort completed players by guess count, then by completion time
-                        const completedPlayers = ranking
-                          .filter(r => r.closestDistance === 0)
-                          .sort((a, b) => {
-                            if (a.guessCount !== b.guessCount) {
-                              return a.guessCount - b.guessCount;
-                            }
-                            return (a.completedAt?.getTime() || 0) - (b.completedAt?.getTime() || 0);
-                          });
-                        
-                        const position = completedPlayers.findIndex(r => r.playerId === playerId) + 1;
-                        if (position <= 3) {
-                          medalPosition = position as 1 | 2 | 3;
-                        }
-                      }
-                    } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
-                      // Stop/Battle Royale: closest distance, medal for closest guess
-                      numberBadge = playerRanking?.closestDistance;
-                      
-                      // Sort players by closest distance for medal positions
-                      const sortedByDistance = ranking
-                        .filter(r => r.closestDistance !== undefined)
-                        .sort((a, b) => (a.closestDistance || 0) - (b.closestDistance || 0));
-                      
-                      const position = sortedByDistance.findIndex(r => r.playerId === playerId) + 1;
-                      if (position <= 3) {
-                        medalPosition = position as 1 | 2 | 3;
-                      }
-                    }
-                    
-                    return (
-                      <PlayerAvatar 
-                        key={playerId} 
-                        id={playerId} 
-                        username={getPlayerById(playerId)?.username} 
-                        size={36}
-                        transparent={!isPlayerOnline && hasPlayerMadeGuesses} // Make avatar transparent if player left but made guesses
-                        numberBadge={numberBadge}
-                        medalPosition={medalPosition}
-                      />
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          }
-          return null;
-        })()}
+        {/* Show all players who have participated in the game */}
+        {playerDisplayData.length > 0 && (
+          <div className="player-list" style={{ paddingBlock: '1rem' }}>
+            <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
+              {playerDisplayData.map((player) => (
+                <PlayerAvatar 
+                  key={player.playerId} 
+                  id={player.playerId} 
+                  username={player.username} 
+                  size={36}
+                  transparent={player.transparent}
+                  numberBadge={player.numberBadge}
+                  medalPosition={player.medalPosition}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="guess-history">
           {/* Show valid guesses sorted by distance */}
