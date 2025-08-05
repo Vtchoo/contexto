@@ -19,7 +19,7 @@ const Container = styled.div`
 const Title = styled.h1`
   color: var(--text-color);
   margin-bottom: 0.5rem;
-  font-size: 3rem;
+  font-size: 2rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   text-align: center;
