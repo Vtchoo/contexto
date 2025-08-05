@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { gameApi, userApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
 import contextualize from '@/utils/contextualize'
@@ -592,12 +592,12 @@ function useGameHook() {
     return () => disconnect()
   }, [])
 
-  function getPlayerById(id: string): Player | undefined {
+  const getPlayerById = useCallback((id: string): Player | undefined => {
     const player = getPlayerFromCache(id)
     if (player.value) {
       return player.value
     }
-  }
+  }, [getPlayerFromCache])
 
   return {
     user,
