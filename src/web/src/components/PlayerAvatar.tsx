@@ -67,7 +67,7 @@ export const PlayerAvatar = ({ username, id, size = 40, transparent, numberBadge
             {numberBadge !== undefined && numberBadge > 0 && (
                 <NumberBadge number={numberBadge} size={Math.max(16, size * 0.4)} />
             )}
-            {medalPosition && (
+            {!!medalPosition && (
                 <MedalBadge position={medalPosition} size={Math.max(20, size * 0.5)} />
             )}
         </AvatarContainer>

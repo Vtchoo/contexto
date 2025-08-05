@@ -123,6 +123,9 @@ function GameInterface({
         if (position <= 3) {
           medalPosition = position as 1 | 2 | 3
         }
+
+        if (numberBadge !== undefined)
+          numberBadge += 1
       }
       
       return {
