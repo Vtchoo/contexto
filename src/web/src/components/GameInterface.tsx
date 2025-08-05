@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Row from './original_Row'
 import { PlayerAvatar } from './PlayerAvatar'
+import { PlayerTooltip } from './PlayerTooltip'
 import { strings } from '../constants/strings'
 import { Player } from '@/api/gameApi'
 import { useGame } from '@/contexts/GameContext'
@@ -54,9 +55,40 @@ function GameInterface({
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
   const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
+  const [tooltipData, setTooltipData] = useState<{
+    isVisible: boolean
+    playerId?: string
+    username?: string
+    closestDistance?: number
+    totalGuesses: number
+    position: { x: number; y: number }
+  }>({
+    isVisible: false,
+    totalGuesses: 0,
+    position: { x: 0, y: 0 }
+  })
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { getPlayerById, currentGame: gameContext } = useGame()
+
+  // Handle player avatar click to show tooltip
+  const handlePlayerClick = (playerId: string, position: { x: number; y: number }) => {
+    const playerRanking = gameContext?.ranking?.find(r => r.playerId === playerId)
+    const username = getPlayerById(playerId)?.username
+    
+    setTooltipData({
+      isVisible: true,
+      playerId,
+      username,
+      closestDistance: playerRanking?.closestDistance,
+      totalGuesses: playerRanking?.guessCount || 0,
+      position
+    })
+  }
+
+  const closeTooltip = () => {
+    setTooltipData(prev => ({ ...prev, isVisible: false }))
+  }
 
   // Calculate player display data for the player list
   const playerDisplayData = useMemo((): PlayerDisplayData[] => {
@@ -472,20 +504,37 @@ function GameInterface({
         {playerDisplayData.length > 0 && (
           <div className="player-list" style={{ paddingBlock: '1rem' }}>
             <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
-              {playerDisplayData.map((player) => (
-                <PlayerAvatar 
-                  key={player.playerId} 
-                  id={player.playerId} 
-                  username={player.username} 
-                  size={36}
-                  transparent={player.transparent}
-                  numberBadge={player.numberBadge}
-                  medalPosition={player.medalPosition}
-                />
-              ))}
+              {playerDisplayData.map((player) => {
+                const playerRanking = gameContext?.ranking?.find(r => r.playerId === player.playerId)
+                return (
+                  <PlayerAvatar 
+                    key={player.playerId} 
+                    id={player.playerId} 
+                    username={player.username} 
+                    size={36}
+                    transparent={player.transparent}
+                    numberBadge={player.numberBadge}
+                    medalPosition={player.medalPosition}
+                    onClick={(_, position) => handlePlayerClick(player.playerId, position)}
+                    closestDistance={playerRanking?.closestDistance}
+                    totalGuesses={playerRanking?.guessCount || 0}
+                  />
+                )
+              })}
             </ul>
           </div>
         )}
+
+        {/* Player tooltip */}
+        <PlayerTooltip
+          username={tooltipData.username}
+          closestDistance={tooltipData.closestDistance}
+          totalGuesses={tooltipData.totalGuesses}
+          gameMode={gameMode}
+          isVisible={tooltipData.isVisible}
+          position={tooltipData.position}
+          onClose={closeTooltip}
+        />
 
         <div className="guess-history">
           {/* Show valid guesses sorted by distance */}

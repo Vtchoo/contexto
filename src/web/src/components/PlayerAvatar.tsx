@@ -8,6 +8,9 @@ interface PlayerAvatarProps {
     transparent?: boolean;
     numberBadge?: number;
     medalPosition?: 1 | 2 | 3;
+    onClick?: (event: React.MouseEvent, position: { x: number; y: number }) => void;
+    closestDistance?: number;
+    totalGuesses?: number;
 }
 
 const AvatarContainer = styled.div`
@@ -15,7 +18,7 @@ const AvatarContainer = styled.div`
     display: inline-block;
 `;
 
-const Avatar = styled.div<{ size: number; transparent?: boolean }>`
+const Avatar = styled.div<{ size: number; transparent?: boolean; clickable?: boolean }>`
     display: flex;
     align-items: center;
     justify-content: center;
@@ -28,6 +31,7 @@ const Avatar = styled.div<{ size: number; transparent?: boolean }>`
     height: ${({ size }) => size}px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     user-select: none;
+    cursor: ${({ clickable }) => clickable ? 'pointer' : 'default'};
 
     
     ${({ transparent }) => transparent && css`
@@ -35,6 +39,13 @@ const Avatar = styled.div<{ size: number; transparent?: boolean }>`
         filter: opacity(0.5);
         &:hover {
             filter: opacity(1);
+        }
+    `};
+
+    ${({ clickable }) => clickable && css`
+        transition: transform 0.2s ease-in-out;
+        &:hover {
+            transform: scale(1.1);
         }
     `};
 `;
@@ -53,14 +64,28 @@ function getInitials(username?: string, id?: string) {
     return '--';
 }
 
-export const PlayerAvatar = ({ username, id, size = 40, transparent, numberBadge, medalPosition }: PlayerAvatarProps) => {
+export const PlayerAvatar = ({ username, id, size = 40, transparent, numberBadge, medalPosition, onClick, closestDistance, totalGuesses }: PlayerAvatarProps) => {
     const initials = getInitials(username, id);
+    
+    const handleClick = (event: React.MouseEvent) => {
+        if (onClick) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const position = {
+                x: rect.left + rect.width / 2,
+                y: rect.top
+            };
+            onClick(event, position);
+        }
+    };
+
     return (
         <AvatarContainer>
             <Avatar
                 size={size}
                 title={username || id}
                 transparent={transparent}
+                clickable={!!onClick}
+                onClick={handleClick}
             >
                 {initials}
             </Avatar>
