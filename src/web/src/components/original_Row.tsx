@@ -58,7 +58,12 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps)
 				<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
 					{displayWord}
 					{addedBy && (addedBy !== playerId) && (
-						<PlayerAvatar id={addedBy} username={getPlayerById(addedBy)?.username} size={24} transparent />
+						<PlayerAvatar 
+							id={addedBy} 
+							username={getPlayerById(addedBy)?.username} 
+							size={24} 
+							transparent 
+						/>
 					)}
 				</div>
 				<span>{distance + 1}</span>

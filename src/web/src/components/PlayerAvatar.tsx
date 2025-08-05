@@ -1,11 +1,19 @@
 import styled, { css } from 'styled-components';
+import { NumberBadge, MedalBadge } from './PlayerBadges';
 
 interface PlayerAvatarProps {
     username?: string;
     id: string;
     size?: number;
     transparent?: boolean;
+    numberBadge?: number;
+    medalPosition?: 1 | 2 | 3;
 }
+
+const AvatarContainer = styled.div`
+    position: relative;
+    display: inline-block;
+`;
 
 const Avatar = styled.div<{ size: number; transparent?: boolean }>`
     display: flex;
@@ -45,15 +53,23 @@ function getInitials(username?: string, id?: string) {
     return '--';
 }
 
-export const PlayerAvatar = ({ username, id, size = 40, transparent }: PlayerAvatarProps) => {
+export const PlayerAvatar = ({ username, id, size = 40, transparent, numberBadge, medalPosition }: PlayerAvatarProps) => {
     const initials = getInitials(username, id);
     return (
-        <Avatar
-            size={size}
-            title={username || id}
-            transparent={transparent}
-        >
-            {initials}
-        </Avatar>
+        <AvatarContainer>
+            <Avatar
+                size={size}
+                title={username || id}
+                transparent={transparent}
+            >
+                {initials}
+            </Avatar>
+            {numberBadge !== undefined && numberBadge > 0 && (
+                <NumberBadge number={numberBadge} size={Math.max(16, size * 0.4)} />
+            )}
+            {medalPosition && (
+                <MedalBadge position={medalPosition} size={Math.max(20, size * 0.5)} />
+            )}
+        </AvatarContainer>
     );
 };
