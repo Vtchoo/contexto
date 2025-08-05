@@ -44,6 +44,7 @@ function GameInterface({
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
+  const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { getPlayerById } = useGame()
@@ -109,7 +110,17 @@ function GameInterface({
       return // Too short
     }
 
+    // Check if word has already been guessed
+    const existingGuess = guesses.find(guess => guess.word.toLowerCase() === word)
+    if (existingGuess) {
+      // Just highlight the existing word instead of sending to server
+      setHighlightedWord(existingGuess.word)
+      setInputValue('')
+      return
+    }
+
     onGuess(word)
+    setHighlightedWord(word)
     setInputValue('')
   }
 
@@ -121,10 +132,9 @@ function GameInterface({
 
   const isWinner = playerGuesses.some(guess => guess.distance === 0)
   
-  // Get last guess for highlighting
-  // const lastGuessData = guesses.length > 0 ? guesses[guesses.length - 1] : null
-  // find last guess for the current player
+  // Get the attempted/highlighted word data for message display, fallback to last guess
   const lastGuessData = playerGuesses.length > 0 ? [...playerGuesses].pop() : null
+  const attemptedWordData = highlightedWord ? guesses.find(guess => guess.word === highlightedWord) : lastGuessData
 
   // Show message based on game state
   let message = null
@@ -151,21 +161,21 @@ function GameInterface({
         </div>
       </div>
     )
-  } else if (lastGuessData?.error) {
+  } else if (attemptedWordData?.error) {
     message = (
       <div className="message">
-        <div className="message-text">{lastGuessData.error}</div>
+        <div className="message-text">{attemptedWordData.error}</div>
       </div>
     )
-  } else if (lastGuessData && !lastGuessData.error) {
+  } else if (attemptedWordData && !attemptedWordData.error) {
     message = (
       <div className="message">
         <div>
           <Row 
-            // guess={lastGuessData}
+            // guess={attemptedWordData}
             // highlight={true}
-            word={lastGuessData.word}
-            distance={lastGuessData.distance}
+            word={attemptedWordData.word}
+            distance={attemptedWordData.distance}
             highlight={true}
           />
         </div>
@@ -334,7 +344,7 @@ function GameInterface({
               key={`${guess.word}-${index}`}
               word={guess.word}
               distance={guess.distance}
-              highlight={lastGuessData?.word === guess.word}
+              highlight={highlightedWord === guess.word}
               hidden={guess.hidden}
               addedBy={guess.addedBy}
               playerId={user.id} // Pass current user's ID for multiplayer context
