@@ -300,7 +300,9 @@ function GameInterface({
             </>
           )}
           <span className="label">TENTATIVAS:</span>{' '}
-          <span>{sortedGuesses.length}</span>
+          <span>
+            {gameMode === 'default' ? sortedGuesses.length : playerGuesses.filter(guess => !guess.error).length}
+          </span>
         </div>
 
         <form onSubmit={handleSubmit}>
