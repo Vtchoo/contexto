@@ -266,6 +266,7 @@ function HomePage() {
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [customGameLoading, setCustomGameLoading] = useState(false)
   const [playerInfo, setPlayerInfo] = useState<Partial<Player> | null>(null)
+  const [profileUpdateSuccess, setProfileUpdateSuccess] = useState(false)
 
   const [showHowToPlay, setShowHowToPlay] = useState(false)
   useEffect(() => {
@@ -474,7 +475,13 @@ function HomePage() {
           e.preventDefault()
           if (!playerInfo)
             return
-          await updatePlayer(playerInfo)
+          try {
+            await updatePlayer(playerInfo)
+            setProfileUpdateSuccess(true)
+            setTimeout(() => setProfileUpdateSuccess(false), 3000) // Hide success message after 3 seconds
+          } catch (error) {
+            console.error('Failed to update profile:', error)
+          }
         }}>
           <label htmlFor="username">Nome de usuário</label>
           <EditUserInput
@@ -487,6 +494,20 @@ function HomePage() {
           <Button type="submit" disabled={!isConnected || loading}>
             Salvar
           </Button>
+            <div style={{
+              // marginTop: '1rem',
+              padding: '0.5rem',
+              color: 'var(--text-color)',
+              textAlign: 'center',
+              fontSize: '0.85rem',
+              fontWeight: 'normal'
+            }}>
+              {profileUpdateSuccess ? (
+                <>✅ Perfil atualizado com sucesso!</>
+              ) : (
+                <>&nbsp;</>
+              )}
+            </div>
         </form>
       </EditUserSection>
 
