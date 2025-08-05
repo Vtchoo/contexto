@@ -252,7 +252,7 @@ const EditUserInput = styled.input`
   }
 `
 
-const DemoGame = styled.div`
+const Game = styled.div`
   width: 100%;
   max-width: 600px;
 `
@@ -360,7 +360,7 @@ function HomePage() {
   if (showGame) {
     return (
       <Container>
-        <DemoGame>
+        <Game>
           <GameInterface
             gameId={currentGame?.gameId ? parseInt(currentGame.gameId) : undefined}
             roomId={currentGame?.roomId}
@@ -375,7 +375,7 @@ function HomePage() {
             user={user}
             players={currentGame?.players || []}
           />
-        </DemoGame>
+        </Game>
       </Container>
     )
   }
