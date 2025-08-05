@@ -39,7 +39,8 @@ export interface IGame {
 export interface PlayerScore {
     playerId: string
     guessCount: number
-    completedAt: Date
+    closestDistance?: number
+    completedAt?: Date
 }
 
 export interface GameState {
@@ -48,4 +49,5 @@ export interface GameState {
     finished: boolean
     players: string[]
     guesses: Guess[]
+    ranking?: PlayerScore[]
 }
