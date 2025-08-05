@@ -47,7 +47,7 @@ function GameInterface({
   const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { getPlayerById } = useGame()
+  const { getPlayerById, currentGame: gameContext } = useGame()
 
   const getGameModeDisplayName = (mode: string | null) => {
     const modeNames = {
@@ -335,9 +335,66 @@ function GameInterface({
         {players.length > 1 && (
           <div className="player-list" style={{ paddingBlock: '1rem' }}>
             <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
-              {players.map(playerId => (
-                <PlayerAvatar key={playerId} id={playerId} username={getPlayerById(playerId)?.username} size={36} />
-              ))}
+              {players.map((playerId) => {
+                const ranking = gameContext?.ranking || [];
+                const playerRanking = ranking.find(r => r.playerId === playerId);
+                
+                // Calculate badges based on game mode and rules
+                let medalPosition: 1 | 2 | 3 | undefined;
+                let numberBadge: number | undefined;
+                
+                if (gameMode === 'default') {
+                  // Coop: number of guesses, no medal
+                  const playerGuesses = guesses.filter(g => g.addedBy === playerId && !g.error);
+                  numberBadge = playerGuesses.length;
+                } else if (gameMode === 'competitive') {
+                  // Competitive: number of guesses, medal for less guesses (must have won)
+                  // Use ranking data for guess count since guesses list only shows closest guess
+                  numberBadge = playerRanking?.guessCount || 0;
+                  
+                  // Show medal only if player has won (closestDistance is 0)
+                  if (playerRanking?.closestDistance === 0) {
+                    // Sort completed players by guess count, then by completion time
+                    const completedPlayers = ranking
+                      .filter(r => r.closestDistance === 0)
+                      .sort((a, b) => {
+                        if (a.guessCount !== b.guessCount) {
+                          return a.guessCount - b.guessCount;
+                        }
+                        return (a.completedAt?.getTime() || 0) - (b.completedAt?.getTime() || 0);
+                      });
+                    
+                    const position = completedPlayers.findIndex(r => r.playerId === playerId) + 1;
+                    if (position <= 3) {
+                      medalPosition = position as 1 | 2 | 3;
+                    }
+                  }
+                } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
+                  // Stop/Battle Royale: closest distance, medal for closest guess
+                  numberBadge = playerRanking?.closestDistance;
+                  
+                  // Sort players by closest distance for medal positions
+                  const sortedByDistance = ranking
+                    .filter(r => r.closestDistance !== undefined)
+                    .sort((a, b) => (a.closestDistance || 0) - (b.closestDistance || 0));
+                  
+                  const position = sortedByDistance.findIndex(r => r.playerId === playerId) + 1;
+                  if (position <= 3) {
+                    medalPosition = position as 1 | 2 | 3;
+                  }
+                }
+                
+                return (
+                  <PlayerAvatar 
+                    key={playerId} 
+                    id={playerId} 
+                    username={getPlayerById(playerId)?.username} 
+                    size={36}
+                    numberBadge={numberBadge}
+                    medalPosition={medalPosition}
+                  />
+                );
+              })}
             </ul>
           </div>
         )}

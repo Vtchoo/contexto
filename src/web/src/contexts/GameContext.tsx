@@ -15,6 +15,12 @@ interface CurrentGame {
   started: boolean
   isHost: boolean
   players?: string[] // List of player IDs in the game
+  ranking?: Array<{
+    playerId: string
+    guessCount: number
+    closestDistance?: number
+    completedAt?: Date
+  }>
 }
 
 type Theme = 'light' | 'dark' | 'auto'
@@ -175,7 +181,8 @@ function useGameHook() {
           finished: prev?.finished || false,
           started: data.started !== undefined ? data.started : (prev?.started || (prev?.gameMode === 'default' || prev?.gameMode === 'competitive')),
           isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false),
-          players: data.players || prev?.players || []
+          players: data.players || prev?.players || [],
+          ranking: data.ranking || prev?.ranking || []
         }
         console.log('Setting currentGame to:', newGame) // Debug log
         return newGame
@@ -209,10 +216,42 @@ function useGameHook() {
       // Handle our own guess result
       setCurrentGame(prev => {
         if (!prev) return null
+        
+        // Update ranking data for current user
+        let updatedRanking = [...(prev.ranking || [])]
+        const playerRankingIndex = updatedRanking.findIndex(r => r.playerId === user?.id)
+        
+        if (!data.guess.error && user?.id) {
+          if (playerRankingIndex >= 0) {
+            // Update existing player ranking
+            const currentRanking = updatedRanking[playerRankingIndex]
+            updatedRanking[playerRankingIndex] = {
+              ...currentRanking,
+              guessCount: currentRanking.guessCount + 1,
+              closestDistance: currentRanking.closestDistance !== undefined 
+                ? Math.min(currentRanking.closestDistance, data.guess.distance)
+                : data.guess.distance,
+              // Set completion time if this guess wins (distance 0) and not already completed
+              completedAt: data.guess.distance === 0 && currentRanking.closestDistance !== 0 
+                ? new Date() 
+                : currentRanking.completedAt
+            }
+          } else {
+            // Add new player to ranking
+            updatedRanking.push({
+              playerId: user.id,
+              guessCount: 1,
+              closestDistance: data.guess.distance,
+              completedAt: data.guess.distance === 0 ? new Date() : undefined
+            })
+          }
+        }
+        
         return {
           ...prev,
           guesses: [...prev.guesses, data.guess],
-          finished: data.gameFinished || false
+          finished: data.gameFinished || false,
+          ranking: updatedRanking
         }
       })
       setLoading(false)
@@ -259,9 +298,40 @@ function useGameHook() {
           }
         }
         
+        // Update ranking data
+        let updatedRanking = [...(prev.ranking || [])]
+        const playerRankingIndex = updatedRanking.findIndex(r => r.playerId === data.addedBy)
+        
+        if (!data.error) {
+          if (playerRankingIndex >= 0) {
+            // Update existing player ranking
+            const currentRanking = updatedRanking[playerRankingIndex]
+            updatedRanking[playerRankingIndex] = {
+              ...currentRanking,
+              guessCount: currentRanking.guessCount + 1,
+              closestDistance: currentRanking.closestDistance !== undefined 
+                ? Math.min(currentRanking.closestDistance, data.distance)
+                : data.distance,
+              // Set completion time if this guess wins (distance 0) and not already completed
+              completedAt: data.distance === 0 && currentRanking.closestDistance !== 0 
+                ? new Date() 
+                : currentRanking.completedAt
+            }
+          } else {
+            // Add new player to ranking
+            updatedRanking.push({
+              playerId: data.addedBy,
+              guessCount: 1,
+              closestDistance: data.distance,
+              completedAt: data.distance === 0 ? new Date() : undefined
+            })
+          }
+        }
+        
         return {
           ...prev,
-          guesses: updatedGuesses
+          guesses: updatedGuesses,
+          ranking: updatedRanking
         }
       })
     })
