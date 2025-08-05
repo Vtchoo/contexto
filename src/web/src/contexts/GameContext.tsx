@@ -153,15 +153,46 @@ function useGameHook() {
       // Handle other players' guesses in multiplayer
       setCurrentGame(prev => {
         if (!prev) return null
+        
+        const newGuess = {
+          word: data.word,
+          distance: data.distance,
+          addedBy: data.addedBy,
+          error: data.error,
+          hidden: data.hidden
+        }
+        
+        let updatedGuesses = [...prev.guesses]
+        
+        // If it's the current user's guess, always add it
+        if (data.addedBy === user?.id) {
+          updatedGuesses.push(newGuess)
+        } else {
+          // For other players' guesses in competitive and stop modes, keep only the closest guess per player
+          if (prev.gameMode === 'competitive' || prev.gameMode === 'stop') {
+            // Find existing guess from this player
+            const existingGuessIndex = updatedGuesses.findIndex(guess => guess.addedBy === data.addedBy)
+            
+            if (existingGuessIndex >= 0) {
+              const existingGuess = updatedGuesses[existingGuessIndex]
+              // Only replace if the new guess is closer (lower distance)
+              if (data.distance < existingGuess.distance) {
+                updatedGuesses[existingGuessIndex] = newGuess
+              }
+              // If new guess is not closer, don't add it
+            } else {
+              // No existing guess from this player, add the new one
+              updatedGuesses.push(newGuess)
+            }
+          } else {
+            // For default and battle-royale modes, keep all guesses
+            updatedGuesses.push(newGuess)
+          }
+        }
+        
         return {
           ...prev,
-          guesses: [...prev.guesses, {
-            word: data.word,
-            distance: data.distance,
-            addedBy: data.addedBy,
-            error: data.error,
-            hidden: data.hidden
-          }]
+          guesses: updatedGuesses
         }
       })
     })
