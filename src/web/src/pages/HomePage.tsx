@@ -266,7 +266,7 @@ function HomePage() {
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [customGameLoading, setCustomGameLoading] = useState(false)
   const [playerInfo, setPlayerInfo] = useState<Partial<Player> | null>(null)
-  const [profileUpdateSuccess, setProfileUpdateSuccess] = useState(false)
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   const [showHowToPlay, setShowHowToPlay] = useState(false)
   useEffect(() => {
@@ -477,17 +477,19 @@ function HomePage() {
             return
           try {
             await updatePlayer(playerInfo)
-            setProfileUpdateSuccess(true)
-            setTimeout(() => setProfileUpdateSuccess(false), 3000) // Hide success message after 3 seconds
+            setProfileMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' })
           } catch (error) {
             console.error('Failed to update profile:', error)
+            setProfileMessage({ type: 'error', text: 'Erro ao atualizar perfil. Tente novamente.' })
+          } finally {
+            setTimeout(() => setProfileMessage(null), 3000) // Hide message after 3 seconds
           }
         }}>
           <label htmlFor="username">Nome de usuário</label>
           <EditUserInput
             type="text"
             placeholder="Seu nome de usuário"
-            value={playerInfo?.username || ''}
+            value={playerInfo?.username || user?.username || ''}
             onChange={(e) => setPlayerInfo({ ...playerInfo, username: e.target.value })}
             disabled={!isConnected || loading}
           />
@@ -502,8 +504,8 @@ function HomePage() {
               fontSize: '0.85rem',
               fontWeight: 'normal'
             }}>
-              {profileUpdateSuccess ? (
-                <>✅ Perfil atualizado com sucesso!</>
+              {profileMessage ? (
+                <>{profileMessage.type === 'success' ? '✅' : '❌'} {profileMessage.text}</>
               ) : (
                 <>&nbsp;</>
               )}
