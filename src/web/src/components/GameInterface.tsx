@@ -75,7 +75,7 @@ function GameInterface({
 
     const ranking = gameContext?.ranking || []
 
-    return allRelevantPlayers.map((playerId) => {
+    const playerList = allRelevantPlayers.map((playerId) => {
       const playerRanking = ranking.find(r => r.playerId === playerId)
       const isPlayerOnline = players.includes(playerId)
       const hasPlayerMadeGuesses = playersWithGuesses.includes(playerId)
@@ -134,6 +134,49 @@ function GameInterface({
         medalPosition
       }
     })
+
+    // Sort players based on game mode
+    if (gameMode === 'competitive') {
+      // Competitive: order by less guesses (winners first, then by guess count)
+      return playerList.sort((a: PlayerDisplayData, b: PlayerDisplayData) => {
+        const aRanking = ranking.find(r => r.playerId === a.playerId)
+        const bRanking = ranking.find(r => r.playerId === b.playerId)
+        
+        const aWon = aRanking?.closestDistance === 0
+        const bWon = bRanking?.closestDistance === 0
+        
+        // Winners first
+        if (aWon && !bWon) return -1
+        if (!aWon && bWon) return 1
+        
+        // If both won or both didn't win, sort by guess count
+        const aGuesses = aRanking?.guessCount || 0
+        const bGuesses = bRanking?.guessCount || 0
+        return aGuesses - bGuesses
+      })
+    } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
+      // Stop/Battle Royale: order by closest distance, tiebreaker is least guesses
+      return playerList.sort((a: PlayerDisplayData, b: PlayerDisplayData) => {
+        const aRanking = ranking.find(r => r.playerId === a.playerId)
+        const bRanking = ranking.find(r => r.playerId === b.playerId)
+        
+        const aDistance = aRanking?.closestDistance ?? Infinity
+        const bDistance = bRanking?.closestDistance ?? Infinity
+        
+        // Sort by closest distance first
+        if (aDistance !== bDistance) {
+          return aDistance - bDistance
+        }
+        
+        // Tiebreaker: least guesses
+        const aGuesses = aRanking?.guessCount || 0
+        const bGuesses = bRanking?.guessCount || 0
+        return aGuesses - bGuesses
+      })
+    }
+
+    // Default mode: no specific ordering (keep original order)
+    return playerList
   }, [guesses, players, gameMode, gameContext?.ranking, getPlayerById])
 
   const getGameModeDisplayName = (mode: string | null) => {
