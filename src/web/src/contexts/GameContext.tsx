@@ -17,6 +17,36 @@ interface CurrentGame {
   players?: string[] // List of player IDs in the game
 }
 
+type Theme = 'light' | 'dark' | 'auto'
+
+interface GameSettings {
+  theme: Theme
+}
+
+// Helper functions for localStorage
+const getStoredSettings = (): GameSettings => {
+  const stored = localStorage.getItem('contexto-game-settings')
+  if (stored) {
+    try {
+      return JSON.parse(stored)
+    } catch {
+      // If parsing fails, return defaults
+    }
+  }
+  return {
+    theme: 'auto',
+  }
+}
+
+const saveSettings = (settings: GameSettings) => {
+  localStorage.setItem('contexto-game-settings', JSON.stringify(settings))
+}
+
+// Check if user prefers dark mode by default
+const getSystemPrefersDark = (): boolean => {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
 function useGameHook() {
   const [user, setUser] = useState<Player | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -25,6 +55,9 @@ function useGameHook() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Theme and settings state
+  const [settings, setSettings] = useState<GameSettings>(() => getStoredSettings())
 
   // const [playersCache, setPlayersCache] = useState<Map<string, Player>>(new Map())
   const { get: getPlayerFromCache, add: addToPlayerCache } = useCache(async (playerId: string) => userApi.getPlayerById(playerId))
@@ -60,6 +93,42 @@ function useGameHook() {
       initializationInProgress.current = false
     }
   }
+
+  // Apply theme to document
+  const applyTheme = (theme: Theme) => {
+    let effectiveTheme: 'light' | 'dark'
+    
+    if (theme === 'auto') {
+      effectiveTheme = getSystemPrefersDark() ? 'dark' : 'light'
+    } else {
+      effectiveTheme = theme
+    }
+    
+    document.documentElement.setAttribute('data-theme', effectiveTheme)
+  }
+
+  // Theme and settings functions
+  const setTheme = (theme: Theme) => {
+    const newSettings = { ...settings, theme }
+    setSettings(newSettings)
+    saveSettings(newSettings)
+    applyTheme(theme)
+  }
+
+  // Initialize theme on mount
+  useEffect(() => {
+    applyTheme(settings.theme)
+    // Listen for system theme changes when using auto mode
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = () => {
+      if (settings.theme === 'auto') {
+        applyTheme('auto')
+      }
+    }
+    
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [settings.theme])
 
   useEffect(() => {
     if (!user)
@@ -468,6 +537,7 @@ function useGameHook() {
     isInitialized,
     loading,
     error,
+    settings,
     connect,
     disconnect,
     createGame,
@@ -479,6 +549,7 @@ function useGameHook() {
     clearError,
     getPlayerById,
     updatePlayer,
+    setTheme,
   }
 }
 

@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import GameInterface from '../components/GameInterface'
 import { useGame } from '../contexts/GameContext'
 import CustomGameModal from '../components/CustomGameModal'
+import { Settings } from '../components/Settings'
 import { GameMode, Player } from '@/api/gameApi'
 
 const Container = styled.div`
@@ -512,6 +513,8 @@ function HomePage() {
             </div>
         </form>
       </EditUserSection>
+
+      <Settings />
 
       {!isConnected && (
         <div style={{ 
