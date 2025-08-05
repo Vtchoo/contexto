@@ -188,6 +188,27 @@ class ContextoStopGame extends ContextoBaseGame {
         return this.winnerInfo
     }
 
+    // Get comprehensive ranking for all players
+    private getAllPlayersRanking(): Array<{ playerId: string; guessCount: number; closestDistance?: number }> {
+        return this.players.map(playerId => {
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            const validGuesses = playerGuesses.filter(guess => !guess.error)
+            const closestDistance = validGuesses.reduce((min, guess) => {
+                if (guess.distance !== undefined) {
+                    if (min === undefined) return guess.distance
+                    return Math.min(min, guess.distance)
+                }
+                return min
+            }, undefined as number | undefined)
+            
+            return {
+                playerId,
+                guessCount: validGuesses.length,
+                closestDistance
+            }
+        })
+    }
+
     // Get leaderboard ranked by closest guess distance
     getLeaderboard(): Array<{ playerId: string; closestDistance: number; closestWord: string; guessCount: number }> {
         const leaderboard: Array<{ playerId: string; closestDistance: number; closestWord: string; guessCount: number }> = []
@@ -301,6 +322,9 @@ class ContextoStopGame extends ContextoBaseGame {
             } as Guess))
             
         const guesses = [...playerGuesses, ...otherPlayersGuesses].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+
+        // Use the comprehensive ranking method for consistency
+        const ranking = this.getAllPlayersRanking()
     
         return {
             id: this.id,
@@ -308,17 +332,7 @@ class ContextoStopGame extends ContextoBaseGame {
             finished: this.finished,
             players: this.players,
             guesses: guesses,
-            ranking: Array.from(this.playerGuesses.entries()).map(([id, guesses]) => ({
-                playerId: id,
-                guessCount: (guesses || []).filter(guess => !guess.error).length,
-                closestDistance: (guesses || []).reduce((min, guess) => {
-                    if (!guess.error && guess.distance !== undefined) {
-                        if (min === undefined) return guess.distance
-                        return Math.min(min, guess.distance)
-                    }
-                    return min
-                }, undefined as number | undefined),
-            }))
+            ranking: ranking
         }   
     }
 }

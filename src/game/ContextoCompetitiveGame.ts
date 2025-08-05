@@ -8,7 +8,7 @@ import { ContextoBaseGame } from './ContextoBaseGame'
 
 class ContextoCompetitiveGame extends ContextoBaseGame {
     private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
-    private playerCompletions: PlayerScore[] = [] // Track when players complete the word
+    private completionTimestamps: Map<string, Date> = new Map() // Track completion timestamps
     
     finished = false // Always false in competitive mode
 
@@ -27,11 +27,13 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
 
     removePlayer(playerId: string): void {
         super.removePlayer(playerId)
-        // Remove player's guesses and completions
-        this.playerGuesses.delete(playerId)
-        this.playerCompletions = this.playerCompletions.filter(score => score.playerId !== playerId)
+        // Remove player's guesses and completion timestamp
+        // this.playerGuesses.delete(playerId)
+        // this.completionTimestamps.delete(playerId)
         // Note: Don't finish the game when players leave in competitive mode
     }
+
+
 
     addGuess(playerId: string, guess: Guess): void {
         if (!this.players.includes(playerId)) {
@@ -78,7 +80,7 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         }
 
         // Check if player already completed the word
-        const hasCompleted = this.playerCompletions.some(score => score.playerId === playerId)
+        const hasCompleted = this.hasPlayerCompleted(playerId)
         if (hasCompleted) {
             throw new Error(`Player ${playerId} has already found the word`)
         }
@@ -88,14 +90,9 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         if (cachedGuess) {
             this.addGuess(playerId, cachedGuess)
             
-            // Check if player found the word
+            // Check if player found the word and record completion timestamp
             if (!cachedGuess.error && cachedGuess.distance === 0) {
-                const playerGuesses = this.playerGuesses.get(playerId) || []
-                this.playerCompletions.push({
-                    playerId,
-                    guessCount: playerGuesses.length,
-                    completedAt: new Date()
-                })
+                this.completionTimestamps.set(playerId, new Date())
             }
             
             return cachedGuess
@@ -105,14 +102,9 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         const guess = await this.processWordFromAPI(playerId, word)
         this.addGuess(playerId, guess)
 
-        // Check if player found the word - don't end game, just record completion
+        // Check if player found the word - record completion timestamp
         if (guess.distance === 0) {
-            const playerGuesses = this.playerGuesses.get(playerId) || []
-            this.playerCompletions.push({
-                playerId,
-                guessCount: playerGuesses.length,
-                completedAt: new Date()
-            })
+            this.completionTimestamps.set(playerId, new Date())
         }
 
         return guess
@@ -140,19 +132,39 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         return this.getGuessCount(playerId)
     }
 
-    // Check if player has completed the word
+    // Check if player has completed the word - calculated from guesses
     hasPlayerCompleted(playerId: string): boolean {
-        return this.playerCompletions.some(score => score.playerId === playerId)
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        return playerGuesses.some(guess => !guess.error && guess.distance === 0)
     }
 
-    // Get player's completion info
+    // Get player's completion info - calculated from guesses with timestamp
     getPlayerCompletion(playerId: string): PlayerScore | undefined {
-        return this.playerCompletions.find(score => score.playerId === playerId)
+        if (!this.hasPlayerCompleted(playerId)) {
+            return undefined
+        }
+        
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        const validGuesses = playerGuesses.filter(guess => !guess.error)
+        const closestDistance = validGuesses.reduce((min, guess) => {
+            if (guess.distance !== undefined) {
+                if (min === undefined) return guess.distance
+                return Math.min(min, guess.distance)
+            }
+            return min
+        }, undefined as number | undefined)
+        
+        return {
+            playerId,
+            guessCount: validGuesses.length,
+            closestDistance,
+            completedAt: this.completionTimestamps.get(playerId)
+        }
     }
 
-    // Get leaderboard ranked by fewest guesses
-    getLeaderboard(): PlayerScore[] {
-        return [...this.playerCompletions]
+    // Get leaderboard ranked by fewest guesses (shows all players, completed and active)
+    getLeaderboard(): Array<{ playerId: string; guessCount: number; closestDistance?: number; completedAt?: Date }> {
+        return this.getAllPlayersRanking()
             .sort((a, b) => {
                 // Sort by guess count (ascending), then by completion time (ascending)
                 if (a.guessCount !== b.guessCount) {
@@ -162,7 +174,28 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
             })
     }
 
-    // Get all players who haven't completed yet with their current guess count
+    // Get comprehensive ranking for all players (completed and active)
+    private getAllPlayersRanking(): PlayerScore[] {
+        return Array.from(this.playerGuesses.entries()).map(([playerId, guesses]) => {
+            const validGuesses = guesses.filter(guess => !guess.error)
+            const closestDistance = validGuesses.reduce((min, guess) => {
+                if (guess.distance !== undefined) {
+                    if (min === undefined) return guess.distance
+                    return Math.min(min, guess.distance)
+                }
+                return min
+            }, undefined as number | undefined)
+            
+            return {
+                playerId,
+                guessCount: validGuesses.length,
+                closestDistance,
+                completedAt: this.completionTimestamps.get(playerId)
+            }
+        })
+    }
+
+    // Get all players who haven't completed yet with their current guess count - calculated from guesses
     getActivePlayerStats(): Array<{ playerId: string; guessCount: number }> {
         return this.players
             .filter(playerId => !this.hasPlayerCompleted(playerId))
@@ -246,17 +279,8 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         
         const guesses = [...playerGuesses, ...otherPlayersGuesses].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
 
-        const ranking = Array.from(this.playerGuesses.entries()).map(([id, guesses]) => ({
-            playerId: id,
-            guessCount: (guesses || []).filter(guess => !guess.error).length,
-            closestDistance: (guesses || []).reduce((min, guess) => {
-                if (!guess.error && guess.distance !== undefined) {
-                    if (min === undefined) return guess.distance
-                    return Math.min(min, guess.distance)
-                }
-                return min
-            }, undefined as number | undefined),
-        }))
+        // Use the comprehensive ranking method for consistency
+        const ranking = this.getAllPlayersRanking()
 
         return {
             id: this.id,

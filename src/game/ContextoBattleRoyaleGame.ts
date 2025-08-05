@@ -216,6 +216,27 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
             .slice(0, count ?? 10) // Limit to the closest guesses
     }
 
+    // Get comprehensive ranking for all players
+    private getAllPlayersRanking(): Array<{ playerId: string; guessCount: number; closestDistance?: number }> {
+        return this.players.map(playerId => {
+            const playerGuesses = this.playerGuesses.get(playerId) || []
+            const validGuesses = playerGuesses.filter(guess => !guess.error)
+            const closestDistance = validGuesses.reduce((min, guess) => {
+                if (guess.distance !== undefined) {
+                    if (min === undefined) return guess.distance
+                    return Math.min(min, guess.distance)
+                }
+                return min
+            }, undefined as number | undefined)
+            
+            return {
+                playerId,
+                guessCount: validGuesses.length,
+                closestDistance
+            }
+        })
+    }
+
     // Get all players' progress for Battle Royale ranking display
     getAllPlayersProgress(): BattleRoyalePlayerProgress[] {
         return this.players.map(playerId => {
@@ -453,23 +474,16 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
         
         const guesses = [...playerGuesses, ...otherPlayersGuesses].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
 
+        // Use the comprehensive ranking method for consistency
+        const ranking = this.getAllPlayersRanking()
+
         return {
             id: this.id,
             started: this.started,
             finished: this.finished,
             players: this.players,
             guesses: guesses,
-            ranking: Array.from(this.playerGuesses.entries()).map(([id, guesses]) => ({
-                playerId: id,
-                guessCount: (guesses || []).filter(guess => !guess.error).length,
-                closestDistance: (guesses || []).reduce((min, guess) => {
-                    if (!guess.error && guess.distance !== undefined) {
-                        if (min === undefined) return guess.distance
-                        return Math.min(min, guess.distance)
-                    }
-                    return min
-                }, undefined as number | undefined),
-            }))
+            ranking: ranking
         }
     }
 }
