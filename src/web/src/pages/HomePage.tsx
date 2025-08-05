@@ -228,7 +228,6 @@ const EditUserSection = styled.div`
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 2px 8px var(--shadow);
-  margin-bottom: 2rem;
 `
 
 const EditUserInput = styled.input`
@@ -500,6 +499,25 @@ function HomePage() {
         }}>
           Conectando ao servidor...
         </div>
+      )}
+
+      {!showHowToPlay && (
+        <button
+          style={{
+            color: 'var(--secondary-text)',
+            textDecoration: 'underline',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+          }}
+          onClick={() => {
+            localStorage.removeItem('hasSeenHowToPlay')
+            setShowHowToPlay(true)
+          }}
+        >
+          Não sei jogar 🤔
+        </button>
       )}
 
       <CustomGameModal
