@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Row from './original_Row'
 import { PlayerAvatar } from './PlayerAvatar'
 import { strings } from '../constants/strings'
@@ -92,6 +92,12 @@ function GameInterface({
 
   const errorGuesses = guesses.filter(guess => guess.error)
 
+  // Detect if it's a multiplayer game based on whether there are guesses from different players
+  const isMultiplayer = useMemo(() => {
+    const uniquePlayers = new Set(guesses.map(guess => guess.addedBy).filter(Boolean))
+    return uniquePlayers.size > 1
+  }, [guesses])
+
   useEffect(() => {
     if (!loading && inputRef.current) {
       inputRef.current.focus()
@@ -130,7 +136,9 @@ function GameInterface({
     }
   }
 
-  const isWinner = playerGuesses.some(guess => guess.distance === 0)
+  const isWinner = gameMode === 'default' 
+    ? sortedGuesses.some(guess => guess.distance === 0) // In default mode, anyone finding the word means everyone wins
+    : playerGuesses.some(guess => guess.distance === 0) // In competitive modes, only individual wins count
   
   // Get the attempted/highlighted word data for message display, fallback to last guess
   const lastGuessData = playerGuesses.length > 0 ? [...playerGuesses].pop() : null
@@ -249,7 +257,7 @@ function GameInterface({
         
         {isWinner && (
           <div className="end-msg">
-            <p>🎉 {strings.game.congratulations}! {strings.game.youWon}</p>
+            <p>🎉 {strings.game.congratulations}! {gameMode === 'default' && isMultiplayer ? strings.game.youAllWon : strings.game.youWon}</p>
           </div>
         )}
 

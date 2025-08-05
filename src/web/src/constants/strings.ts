@@ -39,6 +39,7 @@ export const strings = {
     noGuessesYet: 'Nenhuma tentativa ainda',
     congratulations: 'Parabéns!',
     youWon: 'Você descobriu a palavra!',
+    youAllWon: 'Vocês descobriram a palavra!',
     gameOver: 'Fim de jogo',
     correctWord: 'A palavra correta era: {{word}}',
     giveUp: 'Desistir',
