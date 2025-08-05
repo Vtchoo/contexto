@@ -177,12 +177,12 @@ function useGameHook() {
           roomId: data.roomId,
           gameId: data.gameId,
           gameMode: data?.gameMode || 'default',
-          guesses: data?.guesses || prev?.guesses || [],
+          guesses: data?.guesses || [],
           finished: prev?.finished || false,
           started: data.started !== undefined ? data.started : (prev?.started || (prev?.gameMode === 'default' || prev?.gameMode === 'competitive')),
           isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false),
-          players: data.players || prev?.players || [],
-          ranking: data.ranking || prev?.ranking || []
+          players: data.players || [],
+          ranking: data.ranking || [],
         }
         console.log('Setting currentGame to:', newGame) // Debug log
         return newGame

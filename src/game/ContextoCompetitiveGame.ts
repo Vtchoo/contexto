@@ -246,23 +246,25 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         
         const guesses = [...playerGuesses, ...otherPlayersGuesses].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
 
+        const ranking = Array.from(this.playerGuesses.entries()).map(([id, guesses]) => ({
+            playerId: id,
+            guessCount: (guesses || []).filter(guess => !guess.error).length,
+            closestDistance: (guesses || []).reduce((min, guess) => {
+                if (!guess.error && guess.distance !== undefined) {
+                    if (min === undefined) return guess.distance
+                    return Math.min(min, guess.distance)
+                }
+                return min
+            }, undefined as number | undefined),
+        }))
+
         return {
             id: this.id,
             started: this.started,
             finished: this.finished,
             players: this.players,
             guesses: guesses,
-            ranking: Array.from(this.playerGuesses.entries()).map(([id, guesses]) => ({
-                playerId: id,
-                guessCount: (guesses || []).filter(guess => !guess.error).length,
-                closestDistance: (guesses || []).reduce((min, guess) => {
-                    if (!guess.error && guess.distance !== undefined) {
-                        if (min === undefined) return guess.distance
-                        return Math.min(min, guess.distance)
-                    }
-                    return min
-                }, undefined as number | undefined),
-            }))
+            ranking: ranking,
         }
     }
 }
