@@ -42,7 +42,7 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps)
 	const { getPlayerById } = useGame()
 
 	const displayWord = (hidden && addedBy) ? `@${getPlayerById(addedBy)?.username || addedBy}` : word;
-	console.log({ word, distance, highlight, hidden, addedBy });
+	// console.log({ word, distance, highlight, hidden, addedBy });
 	return (
 		<div className={`row-wrapper ${highlight ? 'current' : ''}`} key={word}>
 			<div className="outer-bar">
