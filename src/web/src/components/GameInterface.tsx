@@ -111,17 +111,20 @@ function GameInterface({
           }
         }
       } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
-        // Stop/Battle Royale: closest distance, medal for closest guess
+        // Stop/Battle Royale: closest distance, medal for closest guess (only when game ended)
         numberBadge = playerRanking?.closestDistance
         
-        // Sort players by closest distance for medal positions
-        const sortedByDistance = ranking
-          .filter(r => r.closestDistance !== undefined)
-          .sort((a, b) => (a.closestDistance || 0) - (b.closestDistance || 0))
-        
-        const position = sortedByDistance.findIndex(r => r.playerId === playerId) + 1
-        if (position <= 3) {
-          medalPosition = position as 1 | 2 | 3
+        // Show medals only when game has finished
+        if (gameFinished) {
+          // Sort players by closest distance for medal positions
+          const sortedByDistance = ranking
+            .filter(r => r.closestDistance !== undefined)
+            .sort((a, b) => (a.closestDistance || 0) - (b.closestDistance || 0))
+          
+          const position = sortedByDistance.findIndex(r => r.playerId === playerId) + 1
+          if (position <= 3) {
+            medalPosition = position as 1 | 2 | 3
+          }
         }
 
         if (numberBadge !== undefined)
