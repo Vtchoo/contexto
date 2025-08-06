@@ -66,6 +66,9 @@ class ContextoDefaultGame extends ContextoBaseGame {
             if (!cachedGuess.error) {
                 this.addGuess(playerId, cachedGuess)
             }
+            if (cachedGuess.distance === 0) {
+                this.finished = true // Mark the game as finished if the guess is correct
+            }
             return cachedGuess
         }
 
