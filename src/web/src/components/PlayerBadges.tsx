@@ -1,4 +1,3 @@
-import React from 'react';
 import styled from 'styled-components';
 
 interface NumberBadgeProps {
@@ -9,7 +8,6 @@ interface NumberBadgeProps {
 interface MedalBadgeProps {
     position?: 1 | 2 | 3;
     size?: number;
-    completed?: boolean;
 }
 
 const BadgeContainer = styled.div<{ size: number }>`
@@ -45,7 +43,7 @@ const MedalBadgeStyled = styled(BadgeContainer)<{ position?: 1 | 2 | 3 }>`
     font-size: ${({ size }) => size * 0.8}px;
 `;
 
-export const NumberBadge: React.FC<NumberBadgeProps> = ({ number, size = 20 }) => {
+export const NumberBadge = ({ number, size = 20 }: NumberBadgeProps) => {
     if (number <= 0) return null;
     
     return (
@@ -55,14 +53,24 @@ export const NumberBadge: React.FC<NumberBadgeProps> = ({ number, size = 20 }) =
     );
 };
 
-export const MedalBadge: React.FC<MedalBadgeProps> = ({ position, completed, size = 24 }) => {
+export const MedalBadge = ({ position, size = 24 }: MedalBadgeProps) => {
     let medalEmoji = position === 1 ? '🥇' : position === 2 ? '🥈' : '🥉';
-    if (completed && !position)
-        medalEmoji = '🏁';
 
     return (
         <MedalBadgeStyled position={position} size={size}>
             {medalEmoji}
+        </MedalBadgeStyled>
+    );
+};
+
+interface CompletionBadgeProps {
+    size?: number;
+}
+
+export const CompletionBadge = ({ size = 24 }: CompletionBadgeProps) => {
+    return (
+        <MedalBadgeStyled position={undefined} size={size}>
+            🏁
         </MedalBadgeStyled>
     );
 };

@@ -35,9 +35,10 @@ interface RowProps {
 	hidden?: boolean;
 	addedBy?: string;
 	playerId?: string; // Optional, used for multiplayer to show the player who added the guess
+	highlightPlayerGuess?: boolean;
 }
 
-function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps) {
+function Row({ word, distance, highlight, hidden, addedBy, playerId, highlightPlayerGuess }: RowProps) {
 
 	const { getPlayerById } = useGame()
 
@@ -50,7 +51,7 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps)
 					className="inner-bar"
 					style={{
 						width: getBarWidth(distance),
-						backgroundColor: (addedBy === playerId) ? getBarColor(distance) : '#4a90e2',
+						backgroundColor: (addedBy !== playerId && highlightPlayerGuess) ? '#4a90e2' : getBarColor(distance),
 					}}
 				/>
 			</div>

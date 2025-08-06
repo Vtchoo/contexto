@@ -1,5 +1,5 @@
 import styled, { css } from 'styled-components';
-import { NumberBadge, MedalBadge } from './PlayerBadges';
+import { NumberBadge, MedalBadge, CompletionBadge } from './PlayerBadges';
 
 interface PlayerAvatarProps {
     username?: string;
@@ -94,8 +94,11 @@ export const PlayerAvatar = ({ username, id, size = 40, transparent, numberBadge
             {numberBadge !== undefined && numberBadge > 0 && (
                 <NumberBadge number={numberBadge} size={Math.max(16, size * 0.4)} />
             )}
-            {(!!medalPosition || completed) && (
-                <MedalBadge position={medalPosition} completed={completed} size={Math.max(20, size * 0.5)} />
+            {!!medalPosition && (
+                <MedalBadge position={medalPosition} size={Math.max(20, size * 0.5)} />
+            )}
+            {(!medalPosition && completed) && (
+                <CompletionBadge size={Math.max(20, size * 0.5)} />
             )}
         </AvatarContainer>
     );

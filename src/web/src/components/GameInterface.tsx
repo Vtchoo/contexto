@@ -590,6 +590,7 @@ function GameInterface({
               hidden={guess.hidden}
               addedBy={guess.addedBy}
               playerId={user.id} // Pass current user's ID for multiplayer context
+              highlightPlayerGuess={gameMode !== 'default' && guess.addedBy !== user.id} // if game is coop, no need to highlight other players
             />
           ))}
           
