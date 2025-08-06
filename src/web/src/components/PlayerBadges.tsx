@@ -7,8 +7,9 @@ interface NumberBadgeProps {
 }
 
 interface MedalBadgeProps {
-    position: 1 | 2 | 3;
+    position?: 1 | 2 | 3;
     size?: number;
+    completed?: boolean;
 }
 
 const BadgeContainer = styled.div<{ size: number }>`
@@ -35,7 +36,7 @@ const NumberBadgeStyled = styled(BadgeContainer)`
     right: -4px;
 `;
 
-const MedalBadgeStyled = styled(BadgeContainer)<{ position: 1 | 2 | 3 }>`
+const MedalBadgeStyled = styled(BadgeContainer)<{ position?: 1 | 2 | 3 }>`
     background: transparent;
     border: none;
     box-shadow: none;
@@ -54,9 +55,11 @@ export const NumberBadge: React.FC<NumberBadgeProps> = ({ number, size = 20 }) =
     );
 };
 
-export const MedalBadge: React.FC<MedalBadgeProps> = ({ position, size = 24 }) => {
-    const medalEmoji = position === 1 ? '🥇' : position === 2 ? '🥈' : '🥉';
-    
+export const MedalBadge: React.FC<MedalBadgeProps> = ({ position, completed, size = 24 }) => {
+    let medalEmoji = position === 1 ? '🥇' : position === 2 ? '🥈' : '🥉';
+    if (completed && !position)
+        medalEmoji = '🏁';
+
     return (
         <MedalBadgeStyled position={position} size={size}>
             {medalEmoji}
