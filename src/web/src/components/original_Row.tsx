@@ -50,7 +50,7 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId }: RowProps)
 					className="inner-bar"
 					style={{
 						width: getBarWidth(distance),
-						backgroundColor: getBarColor(distance),
+						backgroundColor: (addedBy === playerId) ? getBarColor(distance) : '#4a90e2',
 					}}
 				/>
 			</div>
