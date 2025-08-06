@@ -21,6 +21,7 @@ interface CurrentGame {
     closestDistance?: number
     completedAt?: Date
   }>
+  answerWord?: string // The answer word when game finishes
 }
 
 type Theme = 'light' | 'dark' | 'auto'
@@ -341,12 +342,13 @@ function useGameHook() {
         if (!prev) return null
         return {
           ...prev,
-          finished: true
+          finished: true,
+          answerWord: data.answer // Store the answer word from server
         }
       })
       if (data.winner) {
         // Handle game completion
-        console.log(`Game finished! Winner: ${data.winner}`)
+        console.log(`Game finished! Winner: ${data.winner.username}, Answer: ${data.answer}`)
       }
     })
 

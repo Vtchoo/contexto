@@ -318,14 +318,16 @@ function GameInterface({
     const winner = gameContext?.ranking?.find(r => r.closestDistance === 0)
     if (winner) {
       const winnerName = getPlayerById(winner.playerId)?.username || 'Jogador'
+      
       return {
         playerId: winner.playerId,
         username: winnerName,
-        guessCount: winner.guessCount
+        guessCount: winner.guessCount,
+        answerWord: gameContext?.answerWord // Use answer from game context (server provides this)
       }
     }
     return null
-  }, [gameMode, gameFinished, isWinner, gameContext?.ranking, getPlayerById])
+  }, [gameMode, gameFinished, isWinner, gameContext?.ranking, gameContext?.answerWord, getPlayerById])
   
   // Get the attempted/highlighted word data for message display, fallback to last guess
   const lastGuessData = playerGuesses.length > 0 ? [...playerGuesses].pop() : null
@@ -453,6 +455,14 @@ function GameInterface({
             <p>
               {gameMode === 'stop' ? '⚡' : '⚔️'} <strong>{otherPlayerWon.username}</strong> venceu em{' '}
               <strong>{otherPlayerWon.guessCount}</strong> tentativa{otherPlayerWon.guessCount !== 1 ? 's' : ''}!
+              {otherPlayerWon.answerWord && (
+                <>
+                  <br />
+                  A palavra era: <strong style={{ fontSize: '1.1em', color: '#155724' }}>
+                    {otherPlayerWon.answerWord.toUpperCase()}
+                  </strong>
+                </>
+              )}
             </p>
           </div>
         )}
