@@ -22,7 +22,7 @@ const Avatar = styled.div<{ size: number; transparent?: boolean; clickable?: boo
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #4a90e2;
+    background: var(--avatar-bg-color);
     color: #fff;
     font-weight: bold;
     font-size: ${({ size }) => size * 0.45}px;

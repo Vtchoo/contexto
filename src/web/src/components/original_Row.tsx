@@ -51,7 +51,7 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId, highlightPl
 					className="inner-bar"
 					style={{
 						width: getBarWidth(distance),
-						backgroundColor: (addedBy !== playerId && highlightPlayerGuess) ? '#4a90e2' : getBarColor(distance),
+						backgroundColor: (addedBy !== playerId && highlightPlayerGuess) ? 'var(--avatar-bg-color)' : getBarColor(distance),
 					}}
 				/>
 			</div>

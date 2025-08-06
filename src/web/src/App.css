@@ -15,6 +15,7 @@
     --current-guess-border: 3px solid var(--text-color);
     --modal-border: 3px solid var(--text-color);
     --shadow-color: hsl(0deg 0% 0% / 0.075);
+    --avatar-bg-color: #4a90e2;
 }
 
 [data-theme='dark'] {
