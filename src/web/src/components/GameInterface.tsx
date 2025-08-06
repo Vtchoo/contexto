@@ -308,6 +308,25 @@ function GameInterface({
     ? sortedGuesses.some(guess => guess.distance === 0) // In default mode, anyone finding the word means everyone wins
     : playerGuesses.some(guess => guess.distance === 0) // In competitive modes, only individual wins count
   
+  // Check if another player won in stop/battle royale modes
+  const otherPlayerWon = useMemo(() => {
+    if (gameMode !== 'stop' && gameMode !== 'battle-royale') return null
+    if (!gameFinished) return null
+    if (isWinner) return null // Current player won, no need to show other player message
+    
+    // Find the winner from ranking data
+    const winner = gameContext?.ranking?.find(r => r.closestDistance === 0)
+    if (winner) {
+      const winnerName = getPlayerById(winner.playerId)?.username || 'Jogador'
+      return {
+        playerId: winner.playerId,
+        username: winnerName,
+        guessCount: winner.guessCount
+      }
+    }
+    return null
+  }, [gameMode, gameFinished, isWinner, gameContext?.ranking, getPlayerById])
+  
   // Get the attempted/highlighted word data for message display, fallback to last guess
   const lastGuessData = playerGuesses.length > 0 ? [...playerGuesses].pop() : null
   const attemptedWordData = highlightedWord ? guesses.find(guess => guess.word === highlightedWord) : lastGuessData
@@ -426,6 +445,15 @@ function GameInterface({
         {isWinner && (
           <div className="end-msg">
             <p>🎉 {strings.game.congratulations}! {gameMode === 'default' && isMultiplayer ? strings.game.youAllWon : strings.game.youWon}</p>
+          </div>
+        )}
+
+        {otherPlayerWon && (
+          <div className="end-msg" style={{ backgroundColor: '#f8d7da', borderColor: '#f5c6cb', color: '#721c24' }}>
+            <p>
+              {gameMode === 'stop' ? '⚡' : '⚔️'} <strong>{otherPlayerWon.username}</strong> venceu em{' '}
+              <strong>{otherPlayerWon.guessCount}</strong> tentativa{otherPlayerWon.guessCount !== 1 ? 's' : ''}!
+            </p>
           </div>
         )}
 
