@@ -11,13 +11,19 @@ export interface Guess {
     distance?: number
     addedBy: string
     error?: string // Error message if the guess was invalid
+    hidden?: boolean // For multiplayer, to hide guesses until revealed
 }
 
 export interface IGame {
+    id: string
     gameId: number
     // players: string[]
     // guesses: GameWord[]
+    started: boolean
     finished: boolean
+    guessCount: number
+    allowTips: boolean
+    allowGiveUp: boolean
 
     addPlayer(playerId: string): void
     removePlayer(playerId: string): void
@@ -25,10 +31,23 @@ export interface IGame {
     tryWord(playerId: string, word: string): Promise<GameWord>
     getClosestGuesses(playerId: string, count?: number): GameWord[]
     startGame(): void
+    isHost(playerId: string): boolean
+    getPlayerCount(): number
+    getCurrentGameState(playerId: string): GameState
 }
 
 export interface PlayerScore {
     playerId: string
     guessCount: number
-    completedAt: Date
+    closestDistance?: number
+    completedAt?: Date
+}
+
+export interface GameState {
+    id: string
+    started: boolean
+    finished: boolean
+    players: string[]
+    guesses: Guess[]
+    ranking?: PlayerScore[]
 }
