@@ -181,6 +181,11 @@ export const healthApi = {
     const response = await api.get('/health')
     return response.data
   },
+
+  ping: async () => {
+    const response = await api.get('/ping')
+    return response.data
+  },
 }
 
 // Error handling

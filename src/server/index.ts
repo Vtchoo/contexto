@@ -127,6 +127,15 @@ app.get('/health', async (req, res) => {
 	})
 })
 
+// Ping endpoint for keeping the server alive
+app.get('/ping', (req, res) => {
+	res.json({
+		status: 'pong',
+		timestamp: new Date().toISOString(),
+		uptime: Math.floor(process.uptime())
+	})
+})
+
 // Serve static files from the React app build directory
 const publicPath = path.join(__dirname, '../../dist/public')
 app.use(express.static(publicPath))
