@@ -51,6 +51,7 @@ export default defineConfig({
     },
     // Ensure assets are properly handled
     assetsDir: 'assets',
+    emptyOutDir: true, // Clear output directory before build
   },
   // Set base URL for production
   base: '/',
