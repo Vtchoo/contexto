@@ -39,7 +39,19 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
-    sourcemap: true,
+    outDir: '../../dist/public',
+    sourcemap: false, // Disable sourcemaps in production for smaller bundle
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          socket: ['socket.io-client'],
+        },
+      },
+    },
+    // Ensure assets are properly handled
+    assetsDir: 'assets',
   },
+  // Set base URL for production
+  base: '/',
 })

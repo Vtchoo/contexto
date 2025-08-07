@@ -6,7 +6,9 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import compression from 'compression'
+import path from 'path'
 import createConnection from '../database'
+import env from '../../env'
 import snowflakeGenerator from '../utils/snowflake'
 import JWTService from '../utils/jwt'
 import { GameManager } from './GameManager'
@@ -17,7 +19,9 @@ import { setupUserRoutes } from './routes/userRoutes'
 import { setupSocketHandlers } from './socket/socketHandlers'
 import { Player } from '../models/Player'
 
-const corsOrigin = process.env.FRONTEND_URL || ["http://localhost:3000", "http://localhost:3002"]
+const corsOrigin = env.FRONTEND_URL || (env.NODE_ENV === 'production' 
+	? true // Allow all origins in production, or specify your domain
+	: ["http://localhost:3000", "http://localhost:3002"])
 
 const app = express()
 const server = createServer(app)
@@ -29,7 +33,17 @@ const io = new Server(server, {
 })
 
 // Middleware
-app.use(helmet())
+app.use(helmet({
+	contentSecurityPolicy: {
+		directives: {
+			defaultSrc: ["'self'"],
+			styleSrc: ["'self'", "'unsafe-inline'"],
+			scriptSrc: ["'self'"],
+			imgSrc: ["'self'", "data:", "https:"],
+			connectSrc: ["'self'", "ws:", "wss:"],
+		},
+	},
+}))
 app.use(compression())
 app.use(cors({
 	origin: corsOrigin,
@@ -59,7 +73,7 @@ app.use(async (req, res, next) => {
 			res.cookie('contexto_token', newToken, {
 				maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 				httpOnly: true,
-				secure: process.env.NODE_ENV === 'production',
+				secure: env.NODE_ENV === 'production',
 				sameSite: 'lax'
 			})
 			userToken = newToken
@@ -76,7 +90,7 @@ app.use(async (req, res, next) => {
 		res.cookie('contexto_token', userToken, {
 			maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 			httpOnly: true,
-			secure: process.env.NODE_ENV === 'production',
+			secure: env.NODE_ENV === 'production',
 			sameSite: 'lax'
 		})
 	}
@@ -95,18 +109,41 @@ app.use('/api/users', setupUserRoutes(userManager))
 
 // Health check
 app.get('/health', async (req, res) => {
+	const uptime = process.uptime()
+	const memUsage = process.memoryUsage()
+	
 	res.json({
 		status: 'ok',
 		timestamp: new Date().toISOString(),
+		uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
+		environment: env.NODE_ENV,
 		activeRooms: gameManager.getActiveRoomsCount(),
-		activeUsers: await userManager.getActiveUsersCount()
+		activeUsers: await userManager.getActiveUsersCount(),
+		memory: {
+			used: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+			total: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
+		}
 	})
+})
+
+// Serve static files from the React app build directory
+const publicPath = path.join(__dirname, '../../dist/public')
+app.use(express.static(publicPath))
+
+// Catch-all handler: send back React's index.html file for any non-API routes
+app.get('*', (req, res) => {
+	// Don't serve index.html for API routes or socket.io
+	if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+		return res.status(404).json({ error: 'Not found' })
+	}
+	
+	res.sendFile(path.join(publicPath, 'index.html'))
 })
 
 // Setup Socket.IO handlers
 setupSocketHandlers(io, gameManager, userManager)
 
-const PORT = process.env.PORT || 3001
+const PORT = env.PORT
 
 async function startServer() {
 	try {

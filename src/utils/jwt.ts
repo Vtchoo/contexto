@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken'
+import env from '../../env'
 
-// JWT secret - in production this should be from environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'contexto-secret-key-change-in-production'
+// JWT secret from environment variables
+const JWT_SECRET = env.JWT_SECRET
 
 // JWT expiration time
 const JWT_EXPIRES_IN = '30d'

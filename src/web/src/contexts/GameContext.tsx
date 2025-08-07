@@ -4,7 +4,8 @@ import { gameApi, userApi, Player, Guess, CreateGameOptions } from '../api/gameA
 import contextualize from '@/utils/contextualize'
 import { useCache } from '@/hooks/useCache'
 
-const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const socketUrl = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001')
 
 interface CurrentGame {
   roomId: string
