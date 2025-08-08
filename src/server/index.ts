@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import express from 'express'
+import express, { Router } from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import cors from 'cors'
@@ -9,8 +9,6 @@ import compression from 'compression'
 import path from 'path'
 import createConnection from '../database'
 import env from '../../env'
-import snowflakeGenerator from '../utils/snowflake'
-import JWTService from '../utils/jwt'
 import { GameManager } from './GameManager'
 import { UserManager } from './UserManager'
 import { setupGameRoutes } from './routes/gameRoutes'
@@ -57,8 +55,43 @@ app.use(cookieParser())
 const gameManager = new GameManager()
 const userManager = new UserManager(gameManager)
 
+// Health check
+app.get('/health', async (req, res) => {
+	const uptime = process.uptime()
+	const memUsage = process.memoryUsage()
+	
+	res.json({
+		status: 'ok',
+		timestamp: new Date().toISOString(),
+		uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
+		environment: env.NODE_ENV,
+		activeRooms: gameManager.getActiveRoomsCount(),
+		activeUsers: await userManager.getActiveUsersCount(),
+		memory: {
+			used: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+			total: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
+		}
+	})
+})
+
+// Ping endpoint for keeping the server alive
+app.get('/ping', (req, res) => {
+	res.json({
+		status: 'pong',
+		timestamp: new Date().toISOString(),
+		uptime: Math.floor(process.uptime())
+	})
+})
+
+const api = Router({ mergeParams: true })
+
+// Routes
+api.use('/game', setupGameRoutes(gameManager, userManager))
+api.use('/rooms', setupRoomRoutes(gameManager, userManager))
+api.use('/users', setupUserRoutes(userManager))
+
 // JWT Token middleware - authenticate users with JWT tokens
-app.use(async (req, res, next) => {
+api.use(async (req, res, next) => {
 	let userToken = req.cookies.contexto_token
 	let user: Player | null = null
 	let newToken: string | undefined = undefined
@@ -103,38 +136,7 @@ app.use(async (req, res, next) => {
 	next()
 })
 
-// Routes
-app.use('/api/game', setupGameRoutes(gameManager, userManager))
-app.use('/api/rooms', setupRoomRoutes(gameManager, userManager))
-app.use('/api/users', setupUserRoutes(userManager))
-
-// Health check
-app.get('/health', async (req, res) => {
-	const uptime = process.uptime()
-	const memUsage = process.memoryUsage()
-	
-	res.json({
-		status: 'ok',
-		timestamp: new Date().toISOString(),
-		uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
-		environment: env.NODE_ENV,
-		activeRooms: gameManager.getActiveRoomsCount(),
-		activeUsers: await userManager.getActiveUsersCount(),
-		memory: {
-			used: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
-			total: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
-		}
-	})
-})
-
-// Ping endpoint for keeping the server alive
-app.get('/ping', (req, res) => {
-	res.json({
-		status: 'pong',
-		timestamp: new Date().toISOString(),
-		uptime: Math.floor(process.uptime())
-	})
-})
+app.use('/api', api)
 
 // Serve static files from the React app build directory
 const publicPath = path.join(__dirname, '../../dist/public')
