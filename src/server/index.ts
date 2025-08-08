@@ -85,11 +85,6 @@ app.get('/ping', (req, res) => {
 
 const api = Router({ mergeParams: true })
 
-// Routes
-api.use('/game', setupGameRoutes(gameManager, userManager))
-api.use('/rooms', setupRoomRoutes(gameManager, userManager))
-api.use('/users', setupUserRoutes(userManager))
-
 // JWT Token middleware - authenticate users with JWT tokens
 api.use(async (req, res, next) => {
 	let userToken = req.cookies.contexto_token
@@ -135,6 +130,11 @@ api.use(async (req, res, next) => {
 
 	next()
 })
+
+// Routes
+api.use('/game', setupGameRoutes(gameManager, userManager))
+api.use('/rooms', setupRoomRoutes(gameManager, userManager))
+api.use('/users', setupUserRoutes(userManager))
 
 app.use('/api', api)
 
