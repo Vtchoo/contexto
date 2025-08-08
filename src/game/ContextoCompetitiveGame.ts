@@ -22,7 +22,8 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
     addPlayer(playerId: string): void {
         super.addPlayer(playerId)
         // Initialize empty guess array for new player
-        this.playerGuesses.set(playerId, [])
+        if (!this.playerGuesses.has(playerId))
+            this.playerGuesses.set(playerId, [])
     }
 
     removePlayer(playerId: string): void {
