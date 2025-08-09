@@ -143,8 +143,8 @@ function GameInterface({
           }
         }
       } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
-        // Stop/Battle Royale: closest distance, medal for closest guess (only when game ended)
-        numberBadge = playerRanking?.closestDistance
+        // Stop/Battle Royale: show number of guesses on badge, rank by closest distance
+        numberBadge = playerRanking?.guessCount
         
         // Show medals only when game has finished
         if (gameFinished) {
@@ -159,8 +159,8 @@ function GameInterface({
           }
         }
 
-        if (numberBadge !== undefined)
-          numberBadge += 1
+        // if (numberBadge !== undefined)
+        //   numberBadge += 1
       }
       
       return {
