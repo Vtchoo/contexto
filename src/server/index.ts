@@ -92,43 +92,52 @@ api.use(async (req, res, next) => {
 	let newToken: string | undefined = undefined
 
 	if (userToken) {
-		// Verify existing token
-		const result = await userManager.verifyAndRefreshToken(userToken)
-		user = result.user
-		newToken = result.newToken
+		try {
+			// Verify existing token
+			const result = await userManager.verifyAndRefreshToken(userToken)
+			user = result.user
+			newToken = result.newToken
+	
+			if (newToken) {
+				// Update cookie with refreshed token
+				res.cookie('contexto_token', newToken, {
+					maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+					httpOnly: true,
+					secure: env.NODE_ENV === 'production',
+					sameSite: 'lax'
+				})
+				userToken = newToken
+			}
+		} catch (error) {
+			console.error('Error in JWT middleware:', error)
+		}
+	}
 
-		if (newToken) {
-			// Update cookie with refreshed token
-			res.cookie('contexto_token', newToken, {
+	try {
+		if (!user) {
+			// Create new user with JWT token
+			const result = await userManager.createUser()
+			user = result.user
+			userToken = result.token
+	
+			// Set cookie with JWT token
+			res.cookie('contexto_token', userToken, {
 				maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 				httpOnly: true,
 				secure: env.NODE_ENV === 'production',
 				sameSite: 'lax'
 			})
-			userToken = newToken
 		}
+	
+		// Attach user to request
+		req.user = user
+		req.userToken = userToken
+	
+		next()
+	} catch (error) {
+		console.error('Error in JWT middleware:', error)
+		res.status(500).json({ error: 'Internal Server Error' })
 	}
-
-	if (!user) {
-		// Create new user with JWT token
-		const result = await userManager.createUser()
-		user = result.user
-		userToken = result.token
-
-		// Set cookie with JWT token
-		res.cookie('contexto_token', userToken, {
-			maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-			httpOnly: true,
-			secure: env.NODE_ENV === 'production',
-			sameSite: 'lax'
-		})
-	}
-
-	// Attach user to request
-	req.user = user
-	req.userToken = userToken
-
-	next()
 })
 
 // Routes
