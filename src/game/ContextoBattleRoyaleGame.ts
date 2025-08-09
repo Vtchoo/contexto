@@ -15,6 +15,8 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
     private playerGuesses: Map<string, Guess[]> = new Map() // Individual player guesses
     private usedWords: Set<string> = new Set() // Global set of words used by any player
     private usedLemmas: Set<string> = new Set() // Global set of lemmas used by any player
+    private pendingSubmissions = new Set<string>() // Track players currently submitting
+    private submissionTimestamps = new Map<string, Date>() // Track submission order
     finished = false
     private winner: PlayerScore | null = null
 
@@ -47,6 +49,15 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
         super.removePlayer(playerId)
         // Remove player's guesses but keep used words in the global set
         this.playerGuesses.delete(playerId)
+        
+        // Clean up pending submissions and timestamps
+        this.pendingSubmissions.delete(playerId)
+        // Clean up any submission timestamps for this player
+        for (const [key] of this.submissionTimestamps) {
+            if (key.startsWith(`${playerId}-`)) {
+                this.submissionTimestamps.delete(key)
+            }
+        }
         
         // If the winner left, clear the winner
         if (this.winner && this.winner.playerId === playerId) {
@@ -134,7 +145,53 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
         return totalGuesses
     }
 
+    // Atomic winner check using submission timestamp for fairness
+    private checkAndSetWinner(playerId: string, word: string, submissionTime: Date): boolean {
+        // Use winner as the atomic check - if it's already set, someone won
+        if (this.winner !== null) {
+            return false // Someone already won
+        }
+        
+        // Check if there are any earlier submissions still pending
+        // We need to ensure this is truly the FIRST submission to find the answer
+        const submissionKey = `${playerId}-${word}`
+        const currentSubmissionTime = this.submissionTimestamps.get(submissionKey)
+        
+        if (!currentSubmissionTime) {
+            // This shouldn't happen, but safety check
+            return false
+        }
+        
+        // Check if any other pending submissions were made earlier
+        for (const [key, timestamp] of this.submissionTimestamps) {
+            if (key !== submissionKey && timestamp < currentSubmissionTime) {
+                // There's an earlier submission still being processed
+                // We need to wait and see if that one wins first
+                return false
+            }
+        }
+        
+        // Get current guess count INCLUDING the winning guess that will be added
+        const playerGuesses = this.playerGuesses.get(playerId) || []
+        const correctGuessCount = playerGuesses.length + 1 // +1 for the winning guess about to be added
+        
+        // Atomic winner selection - set winner first as the lock
+        this.winner = {
+            playerId,
+            guessCount: correctGuessCount,
+            completedAt: currentSubmissionTime // Use actual submission time for fairness
+        }
+        this.finished = true
+        
+        return true
+    }
+
     async tryWord(playerId: string, word: string): Promise<Guess> {
+        // Capture submission timestamp immediately for fairness
+        const submissionTime = new Date()
+        const submissionKey = `${playerId}-${word}`
+        
+        // Atomic validation and submission registration
         if (this.finished) {
             throw new Error("The game has already finished")
         }
@@ -147,64 +204,82 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
             throw new Error(`Player ${playerId} is not in the game`)
         }
 
-        // Check in the cached words first to get lemma for word usage check
-        const cachedWord = await this.manager.getCachedWord(this.gameId, word)
-        let wordLemma = cachedWord?.lemma
-
-        // If not cached, we need to make a temp API call to get the lemma for checking
-        if (!cachedWord) {
-            try {
-                const { data } = await this.gameApi.play(word)
-                wordLemma = data.lemma
-            } catch (error) {
-                // If API call fails, we'll handle it below in the main logic
-            }
+        // Check if player is already submitting a word to prevent concurrent submissions
+        if (this.pendingSubmissions.has(playerId)) {
+            throw new Error("Player is already submitting a word. Please wait.")
         }
 
-        // Check if this word (or its lemma) has been used by any player
-        if (this.isWordUsed(word, wordLemma)) {
-            const guess: Guess = {
-                word,
-                addedBy: playerId,
-                error: "Alguém já usou esta palavra"
-            }
-            // Don't add this to player's guesses since it's invalid
-            return guess
-        }
+        // Register this submission attempt with timestamp
+        this.pendingSubmissions.add(playerId)
+        this.submissionTimestamps.set(submissionKey, submissionTime)
 
-        // Try to get from cache first using base class helper
-        const cachedGuess = await this.processWordFromCache(playerId, word)
-        if (cachedGuess) {
-            this.addGuess(playerId, cachedGuess)
-            
-            // Check if player found the word and end the game
-            if (!cachedGuess.error && cachedGuess.distance === 0) {
-                this.finished = true
-                this.winner = {
-                    playerId,
-                    guessCount: this.getGuessCount(playerId),
-                    completedAt: new Date()
+        try {
+            // Check in the cached words first to get lemma for word usage check
+            const cachedWord = await this.manager.getCachedWord(this.gameId, word)
+            let wordLemma = cachedWord?.lemma
+
+            // If not cached, we need to make a temp API call to get the lemma for checking
+            if (!cachedWord) {
+                try {
+                    const { data } = await this.gameApi.play(word)
+                    wordLemma = data.lemma
+                } catch (error) {
+                    // If API call fails, we'll handle it below in the main logic
                 }
             }
-            
-            return cachedGuess
-        }
 
-        // Get from API using base class helper
-        const guess = await this.processWordFromAPI(playerId, word)
-        this.addGuess(playerId, guess)
-
-        // Check if player found the word and end the game
-        if (!guess.error && guess.distance === 0) {
-            this.finished = true
-            this.winner = {
-                playerId,
-                guessCount: this.getGuessCount(playerId),
-                completedAt: new Date()
+            // Check if this word (or its lemma) has been used by any player
+            if (this.isWordUsed(word, wordLemma)) {
+                const guess: Guess = {
+                    word,
+                    addedBy: playerId,
+                    error: "Alguém já usou esta palavra"
+                }
+                // Don't add this to player's guesses since it's invalid
+                return guess
             }
+
+            let guess: Guess
+
+            // Try to get from cache first using base class helper
+            const cachedGuess = await this.processWordFromCache(playerId, word)
+            if (cachedGuess) {
+                guess = cachedGuess
+            } else {
+                // Get from API using base class helper
+                guess = await this.processWordFromAPI(playerId, word)
+            }
+
+            // CRITICAL: Check if game finished while we were processing
+            // In Battle Royale mode, only the first player to find the word should win
+            if (this.finished) {
+                // Game finished while we were processing - reject this guess
+                throw new Error("Game finished while processing your guess. Someone else found the word first.")
+            }
+
+            // Check if this is a winning guess BEFORE adding to history
+            const isWinningGuess = !guess.error && guess.distance === 0
+
+            if (isWinningGuess) {
+                // Attempt atomic winner determination BEFORE adding guess
+                const wonGame = this.checkAndSetWinner(playerId, word, submissionTime)
+                
+                if (!wonGame) {
+                    // Someone else already won - this should be treated as invalid
+                    throw new Error("Game finished while processing your guess. Someone else found the word first.")
+                }
+            }
+
+            // Only add the guess to history if we didn't lose the race
+            this.addGuess(playerId, guess)
+            
+            return guess
+
+        } finally {
+            // Always clean up pending submission state
+            this.pendingSubmissions.delete(playerId)
+            this.submissionTimestamps.delete(submissionKey)
         }
-        
-        return guess
     }
 
     getClosestGuesses(playerId: string, count?: number): GameWord[] {
