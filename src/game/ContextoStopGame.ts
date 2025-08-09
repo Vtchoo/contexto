@@ -108,6 +108,25 @@ class ContextoStopGame extends ContextoBaseGame {
             return false // Someone already won
         }
         
+        // Check if there are any earlier submissions still pending
+        // We need to ensure this is truly the FIRST submission to find the answer
+        const submissionKey = `${playerId}-${word}`
+        const currentSubmissionTime = this.submissionTimestamps.get(submissionKey)
+        
+        if (!currentSubmissionTime) {
+            // This shouldn't happen, but safety check
+            return false
+        }
+        
+        // Check if any other pending submissions were made earlier
+        for (const [key, timestamp] of this.submissionTimestamps) {
+            if (key !== submissionKey && timestamp < currentSubmissionTime) {
+                // There's an earlier submission still being processed
+                // We need to wait and see if that one wins first
+                return false
+            }
+        }
+        
         // Get current guess count INCLUDING the winning guess that will be added
         const playerGuesses = this.playerGuesses.get(playerId) || []
         const correctGuessCount = playerGuesses.length + 1 // +1 for the winning guess about to be added
@@ -116,7 +135,7 @@ class ContextoStopGame extends ContextoBaseGame {
         this.winnerInfo = {
             playerId,
             guessCount: correctGuessCount,
-            completedAt: submissionTime // Use submission time for fairness, not completion time
+            completedAt: currentSubmissionTime // Use actual submission time for fairness
         }
         this.finished = true
         
@@ -146,7 +165,7 @@ class ContextoStopGame extends ContextoBaseGame {
             throw new Error("Player is already submitting a word. Please wait.")
         }
 
-        // Register this submission attempt
+        // Register this submission attempt with timestamp
         this.pendingSubmissions.add(playerId)
         this.submissionTimestamps.set(submissionKey, submissionTime)
 
