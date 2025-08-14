@@ -428,6 +428,7 @@ function useGameHook() {
 
     newSocket.on('error', (data) => {
       setError(data.error)
+      console.error('Socket error:', data.error)
     })
 
     setSocket(newSocket)
