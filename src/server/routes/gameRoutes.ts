@@ -5,6 +5,7 @@ import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
 import { getTodaysGameId } from '../../utils/misc'
+import * as zod from 'zod'
 
 // Extend Express Request interface
 declare global {
@@ -44,6 +45,10 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         const randomId = Math.floor(Math.random() * currentId)
         gameId = randomId
       }
+      // detect if gameId is a iso date
+      const { success, data } = zod.string().datetime().safeParse(gameId)
+      if (success)
+        gameId = new Date(data)
 
       const roomId = gameManager.createGame(type, user.id, gameId)
       const game = gameManager.getGame(roomId)
