@@ -438,11 +438,14 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
   // Periodic cleanup
   setInterval(async () => {
     const removedGames = gameManager.cleanupOldGames()
-    const removedUsers = await userManager.cleanupInactiveUsers()
-
-    if (removedGames > 0 || removedUsers > 0) {
-      console.log(`🧹 Cleanup: Removed ${removedGames} old games and ${removedUsers} inactive users`)
+    if (removedGames > 0) {
+      console.log(`🧹 Cleanup: Removed ${removedGames} old games`)
     }
+    
+    // const removedUsers = await userManager.cleanupInactiveUsers()
+    // if (removedGames > 0 || removedUsers > 0) {
+    //   console.log(`🧹 Cleanup: Removed ${removedGames} old games and ${removedUsers} inactive users`)
+    // }
   }, 30 * 60 * 1000) // Every 30 minutes
 
   console.log('⚡ Socket.IO handlers set up successfully')
