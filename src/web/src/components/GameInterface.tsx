@@ -565,6 +565,7 @@ function GameInterface({
 
         {/* Player tooltip */}
         <PlayerTooltip
+          playerId={tooltipData.playerId || ''}
           username={tooltipData.username}
           closestDistance={tooltipData.closestDistance}
           totalGuesses={tooltipData.totalGuesses}
@@ -572,6 +573,8 @@ function GameInterface({
           isVisible={tooltipData.isVisible}
           position={tooltipData.position}
           onClose={closeTooltip}
+          roomId={roomId}
+          currentUserFinished={gameContext?.ranking?.find(r => r.playerId === user.id)?.closestDistance === 0}
         />
 
         <div className="guess-history">

@@ -1,6 +1,8 @@
-import { useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { PlayerGuessesModal } from './PlayerGuessesModal'
 
 interface PlayerTooltipProps {
+  playerId: string
   username?: string
   closestDistance?: number
   totalGuesses: number
@@ -8,18 +10,24 @@ interface PlayerTooltipProps {
   isVisible: boolean
   position: { x: number; y: number }
   onClose: () => void
+  roomId?: string
+  currentUserFinished?: boolean // Whether the current user has finished their game
 }
 
 export function PlayerTooltip({ 
+  playerId,
   username, 
   closestDistance, 
   totalGuesses, 
   gameMode,
   isVisible, 
   position,
-  onClose 
+  onClose,
+  roomId,
+  currentUserFinished = false
 }: PlayerTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const [showGuessesModal, setShowGuessesModal] = useState(false)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -72,6 +80,18 @@ export function PlayerTooltip({
     return formatDistance(closestDistance)
   }
 
+  const handleViewGuesses = () => {
+    setShowGuessesModal(true)
+  }
+
+  const canViewGuesses = () => {
+    return gameMode === 'competitive' && 
+           currentUserFinished && 
+           roomId && 
+           playerId &&
+           closestDistance !== undefined
+  }
+
   // Calculate tooltip position to prevent overflow
   const tooltipStyle: React.CSSProperties = {
     position: 'fixed',
@@ -89,47 +109,91 @@ export function PlayerTooltip({
   }
 
   return (
-    <div ref={tooltipRef} style={tooltipStyle}>
-      <div style={{ 
-        fontWeight: 'bold', 
-        marginBottom: '8px', 
-        color: '#333',
-        borderBottom: '1px solid #eee',
-        paddingBottom: '6px'
-      }}>
-        {username || 'Jogador Anônimo'}
-      </div>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: '#666' }}>Tentativas:</span>
-          <span style={{ fontWeight: 'bold', color: '#333' }}>{totalGuesses}</span>
+    <>
+      <div ref={tooltipRef} style={tooltipStyle}>
+        <div style={{ 
+          fontWeight: 'bold', 
+          marginBottom: '8px', 
+          color: '#333',
+          borderBottom: '1px solid #eee',
+          paddingBottom: '6px'
+        }}>
+          {username || 'Jogador Anônimo'}
         </div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: '#666' }}>{getDistanceLabel()}:</span>
-          <span style={{ 
-            fontWeight: 'bold', 
-            color: closestDistance === 0 ? '#28a745' : '#333'
-          }}>
-            {getDistanceValue()}
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#666' }}>Tentativas:</span>
+            <span style={{ fontWeight: 'bold', color: '#333' }}>{totalGuesses}</span>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#666' }}>{getDistanceLabel()}:</span>
+            <span style={{ 
+              fontWeight: 'bold', 
+              color: closestDistance === 0 ? '#28a745' : '#333'
+            }}>
+              {getDistanceValue()}
+            </span>
+          </div>
         </div>
+
+        {canViewGuesses() && (
+          <div style={{ 
+            marginTop: '12px', 
+            paddingTop: '8px', 
+            borderTop: '1px solid #eee' 
+          }}>
+            <button
+              onClick={handleViewGuesses}
+              style={{
+                width: '100%',
+                padding: '6px 12px',
+                background: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#0056b3'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#007bff'
+              }}
+            >
+              Ver tentativas
+            </button>
+          </div>
+        )}
+        
+        {/* Small arrow pointing to the avatar */}
+        <div style={{
+          position: 'absolute',
+          bottom: '-6px',
+          left: '50%',
+          transform: 'translateX(-50%) rotate(45deg)',
+          width: '12px',
+          height: '12px',
+          backgroundColor: 'white',
+          border: '1px solid #ddd',
+          borderTop: 'none',
+          borderLeft: 'none'
+        }} />
       </div>
-      
-      {/* Small arrow pointing to the avatar */}
-      <div style={{
-        position: 'absolute',
-        bottom: '-6px',
-        left: '50%',
-        transform: 'translateX(-50%) rotate(45deg)',
-        width: '12px',
-        height: '12px',
-        backgroundColor: 'white',
-        border: '1px solid #ddd',
-        borderTop: 'none',
-        borderLeft: 'none'
-      }} />
-    </div>
+
+      {/* Player Guesses Modal */}
+      {showGuessesModal && roomId && playerId && (
+        <PlayerGuessesModal
+          isOpen={showGuessesModal}
+          onClose={() => setShowGuessesModal(false)}
+          roomId={roomId}
+          playerId={playerId}
+          playerUsername={username}
+        />
+      )}
+    </>
   )
 }

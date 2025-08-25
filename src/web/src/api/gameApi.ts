@@ -174,6 +174,12 @@ export const userApi = {
     const response = await api.get(`/api/users/leaderboard?limit=${limit}&sortBy=${sortBy}`)
     return response.data
   },
+
+  // Get player's guesses for a specific game
+  getPlayerGuesses: async (roomId: string, playerId: string): Promise<Guess[]> => {
+    const response = await api.get(`/api/games/${roomId}/player/${playerId}/guesses`)
+    return response.data
+  },
 }
 
 export const healthApi = {
