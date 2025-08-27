@@ -114,7 +114,7 @@ export const PlayerGuessesModal: React.FC<PlayerGuessesModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const playerGuesses = await userApi.getPlayerGuesses(roomId, playerId);
+      const { guesses: playerGuesses } = await userApi.getPlayerGuesses(roomId, playerId);
       setGuesses(playerGuesses);
     } catch (err) {
       console.error('Failed to fetch player guesses:', err);

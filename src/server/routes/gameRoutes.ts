@@ -217,5 +217,40 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
     }
   })
 
+  router.get('/:roomId/players/:playerId/guesses', async (req: Request, res: Response) => {
+    try {
+      const { roomId, playerId } = req.params
+      const userId = req.user?.id
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' })
+      }
+
+      const game = gameManager.getGame(roomId)
+      if (!game) {
+        return res.status(404).json({ error: 'Game not found' })
+      }
+
+      const state = game.getCurrentGameState(userId)
+      if (!state.players.includes(playerId)) {
+        return res.status(403).json({ error: 'Player not in game' })
+      }
+
+      const playerFinishedGame = state.ranking?.some(r => r.playerId === userId && r.completedAt)
+      if (!playerFinishedGame) {
+        return res.status(403).json({ error: 'Player has not finished the game' })
+      }
+
+      const playerGuesses = game.getClosestGuesses(playerId, 100)
+
+      res.json({
+        playerId,
+        guesses: playerGuesses
+      })
+    } catch (error: any) {
+      res.status(400).json({ error: error.message })
+    }
+  })
+
   return router
 }

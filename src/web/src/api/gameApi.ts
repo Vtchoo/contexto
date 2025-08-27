@@ -176,8 +176,8 @@ export const userApi = {
   },
 
   // Get player's guesses for a specific game
-  getPlayerGuesses: async (roomId: string, playerId: string): Promise<Guess[]> => {
-    const response = await api.get(`/api/games/${roomId}/player/${playerId}/guesses`)
+  getPlayerGuesses: async (roomId: string, playerId: string): Promise<{ playerId: string, guesses: Guess[] }> => {
+    const response = await api.get(`/api/game/${roomId}/players/${playerId}/guesses`)
     return response.data
   },
 }
