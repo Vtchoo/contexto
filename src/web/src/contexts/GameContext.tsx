@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { gameApi, userApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
+import { gameApi, userApi, healthApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
+import { KEEP_ALIVE_CONFIG } from '@/utils/keepAlive'
 import contextualize from '@/utils/contextualize'
 import { useCache } from '@/hooks/useCache'
 
@@ -427,6 +428,7 @@ function useGameHook() {
 
     newSocket.on('error', (data) => {
       setError(data.error)
+      console.error('Socket error:', data.error)
     })
 
     setSocket(newSocket)
@@ -593,6 +595,36 @@ function useGameHook() {
   useEffect(() => {
     initializeApp()
     return () => disconnect()
+  }, [])
+
+  // Keep-alive ping to prevent Render from spinning down
+  useEffect(() => {
+    // Only run if keep-alive is enabled (production)
+    if (KEEP_ALIVE_CONFIG.enabled) {
+      const keepAlive = async () => {
+        try {
+          const data = await healthApi.ping()
+          if (KEEP_ALIVE_CONFIG.logging) {
+            console.log('🏓 Keep-alive ping:', data.status, 'uptime:', data.uptime + 's')
+          }
+        } catch (error) {
+          if (KEEP_ALIVE_CONFIG.logging) {
+            console.warn('⚠️ Keep-alive ping failed:', error instanceof Error ? error.message : 'Unknown error')
+          }
+        }
+      }
+
+      // Initial ping after configured delay
+      const initialTimeout = setTimeout(keepAlive, KEEP_ALIVE_CONFIG.initialDelay)
+      
+      // Then ping at configured interval
+      const interval = setInterval(keepAlive, KEEP_ALIVE_CONFIG.interval)
+
+      return () => {
+        clearTimeout(initialTimeout)
+        clearInterval(interval)
+      }
+    }
   }, [])
 
   const getPlayerById = useCallback((id: string): Player | undefined => {

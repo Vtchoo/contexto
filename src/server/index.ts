@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import express from 'express'
+import express, { Router } from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import cors from 'cors'
@@ -9,8 +9,6 @@ import compression from 'compression'
 import path from 'path'
 import createConnection from '../database'
 import env from '../../env'
-import snowflakeGenerator from '../utils/snowflake'
-import JWTService from '../utils/jwt'
 import { GameManager } from './GameManager'
 import { UserManager } from './UserManager'
 import { setupGameRoutes } from './routes/gameRoutes'
@@ -37,10 +35,11 @@ app.use(helmet({
 	contentSecurityPolicy: {
 		directives: {
 			defaultSrc: ["'self'"],
-			styleSrc: ["'self'", "'unsafe-inline'"],
+			styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+			fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
 			scriptSrc: ["'self'"],
 			imgSrc: ["'self'", "data:", "https:"],
-			connectSrc: ["'self'", "ws:", "wss:"],
+			connectSrc: ["'self'", "ws:", "wss:", "https:"],
 		},
 	},
 }))
@@ -55,57 +54,6 @@ app.use(cookieParser())
 // Initialize managers
 const gameManager = new GameManager()
 const userManager = new UserManager(gameManager)
-
-// JWT Token middleware - authenticate users with JWT tokens
-app.use(async (req, res, next) => {
-	let userToken = req.cookies.contexto_token
-	let user: Player | null = null
-	let newToken: string | undefined = undefined
-
-	if (userToken) {
-		// Verify existing token
-		const result = await userManager.verifyAndRefreshToken(userToken)
-		user = result.user
-		newToken = result.newToken
-
-		if (newToken) {
-			// Update cookie with refreshed token
-			res.cookie('contexto_token', newToken, {
-				maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-				httpOnly: true,
-				secure: env.NODE_ENV === 'production',
-				sameSite: 'lax'
-			})
-			userToken = newToken
-		}
-	}
-
-	if (!user) {
-		// Create new user with JWT token
-		const result = await userManager.createUser()
-		user = result.user
-		userToken = result.token
-
-		// Set cookie with JWT token
-		res.cookie('contexto_token', userToken, {
-			maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-			httpOnly: true,
-			secure: env.NODE_ENV === 'production',
-			sameSite: 'lax'
-		})
-	}
-
-	// Attach user to request
-	req.user = user
-	req.userToken = userToken
-
-	next()
-})
-
-// Routes
-app.use('/api/game', setupGameRoutes(gameManager, userManager))
-app.use('/api/rooms', setupRoomRoutes(gameManager, userManager))
-app.use('/api/users', setupUserRoutes(userManager))
 
 // Health check
 app.get('/health', async (req, res) => {
@@ -125,6 +73,79 @@ app.get('/health', async (req, res) => {
 		}
 	})
 })
+
+// Ping endpoint for keeping the server alive
+app.get('/ping', (req, res) => {
+	res.json({
+		status: 'pong',
+		timestamp: new Date().toISOString(),
+		uptime: Math.floor(process.uptime())
+	})
+})
+
+const api = Router({ mergeParams: true })
+
+// JWT Token middleware - authenticate users with JWT tokens
+api.use(async (req, res, next) => {
+	let userToken = req.cookies.contexto_token
+	let user: Player | null = null
+	let newToken: string | undefined = undefined
+
+	if (userToken) {
+		try {
+			// Verify existing token
+			const result = await userManager.verifyAndRefreshToken(userToken)
+			user = result.user
+			newToken = result.newToken
+	
+			if (newToken) {
+				// Update cookie with refreshed token
+				res.cookie('contexto_token', newToken, {
+					maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+					httpOnly: true,
+					secure: env.NODE_ENV === 'production',
+					sameSite: 'lax'
+				})
+				userToken = newToken
+			}
+		} catch (error) {
+			console.error('Error in JWT middleware:', error)
+		}
+	}
+
+	try {
+		if (!user) {
+			// Create new user with JWT token
+			const result = await userManager.createUser()
+			user = result.user
+			userToken = result.token
+	
+			// Set cookie with JWT token
+			res.cookie('contexto_token', userToken, {
+				maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+				httpOnly: true,
+				secure: env.NODE_ENV === 'production',
+				sameSite: 'lax'
+			})
+		}
+	
+		// Attach user to request
+		req.user = user
+		req.userToken = userToken
+	
+		next()
+	} catch (error) {
+		console.error('Error in JWT middleware:', error)
+		res.status(500).json({ error: 'Internal Server Error' })
+	}
+})
+
+// Routes
+api.use('/game', setupGameRoutes(gameManager, userManager))
+api.use('/rooms', setupRoomRoutes(gameManager, userManager))
+api.use('/users', setupUserRoutes(userManager))
+
+app.use('/api', api)
 
 // Serve static files from the React app build directory
 const publicPath = path.join(__dirname, '../../dist/public')

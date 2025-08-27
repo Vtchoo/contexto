@@ -4,6 +4,9 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Set root to the web directory since we're running from project root
+  root: path.resolve(__dirname),
+  
   plugins: [react()],
   resolve: {
     alias: {
@@ -39,7 +42,8 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../../dist/public',
+    // Output to dist/public from project root
+    outDir: path.resolve(__dirname, '../../dist/public'),
     sourcemap: false, // Disable sourcemaps in production for smaller bundle
     rollupOptions: {
       output: {
@@ -51,6 +55,7 @@ export default defineConfig({
     },
     // Ensure assets are properly handled
     assetsDir: 'assets',
+    emptyOutDir: true, // Clear output directory before build
   },
   // Set base URL for production
   base: '/',

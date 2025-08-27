@@ -133,25 +133,12 @@ class ContextoManager {
         const game = gameInfo.game
 
         // Check if game is already finished
-        if (game.finished) {
-            throw new Error("This game has already been completed")
-        }
+        // if (game.finished) {
+        //     throw new Error("This game has already been completed")
+        // }
 
-        // Type-specific validations
-        if (game instanceof ContextoCompetitiveGame) {
-            // Check if game has room for more players
-            if (game.players.length >= 10) {
-                throw new Error("This competitive game is full (max 10 players)")
-            }
-            // Check if player already completed this game
-            if (game.hasPlayerCompleted(playerId)) {
-                throw new Error("You have already completed this game")
-            }
-        } else {
-            // For default, stop, and battle-royale games
-            if (game.getPlayerCount() >= 20) {
-                throw new Error("This game is full (max 20 players)")
-            }
+        if (game.getPlayerCount() >= 20) {
+            throw new Error("This game is full (max 20 players)")
         }
 
         // Add player to the game

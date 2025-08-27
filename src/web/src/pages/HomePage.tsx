@@ -286,9 +286,9 @@ function HomePage() {
         .then(() => {
           setShowGame(true)
           // Remove the room parameter from URL after joining
-          const newParams = new URLSearchParams(searchParams)
-          newParams.delete('room')
-          setSearchParams(newParams)
+          // const newParams = new URLSearchParams(searchParams)
+          // newParams.delete('room')
+          // setSearchParams(newParams)
         })
         .catch((error) => {
           console.error('Failed to join room from URL:', error)
