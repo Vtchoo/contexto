@@ -15,7 +15,8 @@
     "web:preview": "vite preview",
     "setup": "ts-node setup.ts",
     "typeorm": "npx typeorm-ts-node-commonjs -d ./dataSource.ts",
-    "migrate": "npm run typeorm migration:run",
+    "migration:create": "npx typeorm-ts-node-commonjs migration:create",
+    "migration:run": "npm run typeorm migration:run",
     "dev": "nodemon src/index.ts",
     "dev:server": "nodemon src/server/index.ts",
     "dev:web": "vite"
