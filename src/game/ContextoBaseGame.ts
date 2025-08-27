@@ -2,7 +2,7 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
-import { GameState, GameWord, Guess, IGame } from './interface'
+import { GameState, GameWord, Guess, IGame, GameRestorationOptions } from './interface'
 import type { ContextoManager } from './ContextoManager'
 
 abstract class ContextoBaseGame implements IGame {
@@ -20,9 +20,18 @@ abstract class ContextoBaseGame implements IGame {
     abstract finished: boolean
     abstract guessCount: number
 
-    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date, restorationOptions?: GameRestorationOptions) {
         this.manager = manager
-        this.players.push(playerId)
+        
+        // Use restoration ID if provided, otherwise generate new one
+        if (restorationOptions?.id) {
+            ;(this as any).id = restorationOptions.id
+        }
+        
+        // Add initial player unless skipping for restoration
+        if (!restorationOptions?.skipPlayerInit) {
+            this.players.push(playerId)
+        }
 
         // Initialize game with specific id, date, or use today's game
         if (typeof gameIdOrDate === 'number') {
@@ -34,6 +43,11 @@ abstract class ContextoBaseGame implements IGame {
             this.gameId = getTodaysGameId() - diffDays
         } else {
             this.gameId = getTodaysGameId()
+        }
+        
+        // Set restoration state if provided
+        if (restorationOptions?.started !== undefined) {
+            this.started = restorationOptions.started
         }
         
         this.gameApi = GameApi('pt-br', this.gameId)
@@ -286,6 +300,18 @@ abstract class ContextoBaseGame implements IGame {
     
     // Helper method for tip calculation - each game implements differently
     protected abstract getGuessHistoryForTips(playerId: string): Array<[string, number]>
+
+    // Notify manager when a guess is added (for persistence)
+    protected notifyGuessAdded(): void {
+        // Use setTimeout to avoid blocking the current operation
+        setTimeout(async () => {
+            try {
+                await this.manager.onGuessAdded(this)
+            } catch (error) {
+                console.error(`Error notifying guess added for game ${this.id}:`, error)
+            }
+        }, 0)
+    }
 }
 
 export { ContextoBaseGame }

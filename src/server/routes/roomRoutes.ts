@@ -18,7 +18,7 @@ export function setupRoomRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Invalid room ID' })
       }
 
-      const game = gameManager.getGame(roomId)
+      const game = await gameManager.getGame(roomId)
       if (!game) {
         return res.status(404).json({ error: 'Room not found' })
       }

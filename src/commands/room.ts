@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
 import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
+import { IGame } from "../game/interface"
 import snowflakeGenerator from "../utils/snowflake"
 
 class RoomCommand implements ICommand {
@@ -51,7 +52,7 @@ class RoomCommand implements ICommand {
             return null
         }
 
-        const gameInfo = gameManager.getGameInfo(roomId)
+        const gameInfo = await gameManager.getGameInfo(roomId)
         
         if (gameInfo.exists && gameInfo.game) {
             return gameInfo.game
@@ -76,7 +77,7 @@ class RoomCommand implements ICommand {
         return currentGame
     }
 
-    private async showRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | ContextoBattleRoyaleGame, roomId: string | null) {
+    private async showRoomInfo(interaction: ChatInputCommandInteraction<'cached'>, game: IGame, roomId: string | null) {
         const roomIdOrUndefined = roomId || undefined
         
         if (game instanceof ContextoCompetitiveGame) {

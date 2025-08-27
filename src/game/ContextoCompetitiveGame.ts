@@ -2,7 +2,7 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
-import { GameState, GameWord, Guess, IGame, PlayerScore } from './interface'
+import { GameState, GameWord, Guess, IGame, PlayerScore, GameRestorationOptions } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -12,11 +12,21 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
     
     finished = false // Always false in competitive mode
 
-    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        super(playerId, manager, gameIdOrDate)
-        this.started = true
-        // Initialize empty guess array for the first player
-        this.playerGuesses.set(playerId, [])
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date, restorationOptions?: GameRestorationOptions) {
+        super(playerId, manager, gameIdOrDate, restorationOptions)
+        
+        // Restore guesses if provided, otherwise initialize empty for the first player
+        if (restorationOptions?.initialGuesses) {
+            this.playerGuesses = new Map(restorationOptions.initialGuesses)
+        } else if (!restorationOptions?.skipPlayerInit) {
+            // Initialize empty guess array for the first player only if not skipping player init
+            this.playerGuesses.set(playerId, [])
+        }
+        
+        // Competitive games start immediately unless restoration says otherwise
+        if (!restorationOptions?.started) {
+            this.started = true
+        }
     }
 
     addPlayer(playerId: string): void {
@@ -49,6 +59,9 @@ class ContextoCompetitiveGame extends ContextoBaseGame {
         }
         
         playerGuesses.push(guess)
+        
+        // Notify manager for persistence
+        this.notifyGuessAdded()
     }
 
     // Get existing guess from player's personal guesses

@@ -37,7 +37,7 @@ class JoinCommand implements ICommand {
 
         try {
             // Get game info using unified method
-            const gameInfo = gameManager.getGameInfo(gameInstanceId)
+            const gameInfo = await gameManager.getGameInfo(gameInstanceId)
             if (!gameInfo.exists || !gameInfo.game) {
                 await interaction.reply({
                     content: `❌ Sala com ID \`${gameInstanceId}\` não encontrada.`,
@@ -49,7 +49,7 @@ class JoinCommand implements ICommand {
             const game = gameInfo.game
 
             // Join the game using the unified method
-            const joinedGame = gameManager.joinGame(playerId, gameInstanceId)
+            const joinedGame = await gameManager.joinGame(playerId, gameInstanceId)
             
             // Handle different game types for response messages
             if (joinedGame instanceof ContextoCompetitiveGame) {

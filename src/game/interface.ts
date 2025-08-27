@@ -1,3 +1,11 @@
+export interface GameRestorationOptions {
+    id?: string
+    started?: boolean
+    finished?: boolean
+    skipPlayerInit?: boolean // Don't add the initial player to the players array
+    initialGuesses?: Map<string, Guess[]> // Pre-populate guesses during construction
+}
+
 export interface GameWord {
     word: string
     lemma?: string

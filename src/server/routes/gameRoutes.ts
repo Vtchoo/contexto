@@ -46,7 +46,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       }
 
       const roomId = gameManager.createGame(type, user.id, gameId)
-      const game = gameManager.getGame(roomId)
+      const game = await gameManager.getGame(roomId)
 
       // Update user's current room
       userManager.joinUserToRoom(user.id, roomId)
@@ -72,7 +72,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Invalid room ID' })
       }
 
-      const game = gameManager.getGame(roomId)
+      const game = await gameManager.getGame(roomId)
       if (!game) {
         return res.status(404).json({ error: 'Game not found' })
       }
@@ -81,7 +81,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Game has already finished' })
       }
 
-      gameManager.joinGame(token, roomId)
+      await gameManager.joinGame(token, roomId)
 
       // Update user's current room
       const payload = JWTService.verifyToken(token)
@@ -115,7 +115,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Word is required' })
       }
 
-      const game = gameManager.getGame(roomId)
+      const game = await gameManager.getGame(roomId)
       if (!game) {
         return res.status(404).json({ error: 'Game not found' })
       }
@@ -161,7 +161,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
         return res.status(400).json({ error: 'Invalid room ID' })
       }
 
-      const game = gameManager.getGame(roomId)
+      const game = await gameManager.getGame(roomId)
       if (!game) {
         return res.status(404).json({ error: 'Game not found' })
       }

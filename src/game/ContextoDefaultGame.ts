@@ -2,7 +2,7 @@ import { AxiosError } from 'axios'
 import GameApi from './gameApi'
 import { getTodaysGameId, halfTipDistance, nextTipDistance, randomTipDistance } from './utils/misc'
 import snowflakeGenerator from '../utils/snowflake'
-import { GameState, GameWord, Guess, IGame } from './interface'
+import { GameState, GameWord, Guess, IGame, GameRestorationOptions } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -22,9 +22,26 @@ class ContextoDefaultGame extends ContextoBaseGame {
         return this.guesses.length
     }
 
-    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        super(playerId, manager, gameIdOrDate)
-        this.started = true // Default games start immediately
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date, restorationOptions?: GameRestorationOptions) {
+        super(playerId, manager, gameIdOrDate, restorationOptions)
+        
+        // Set finished state from restoration options
+        if (restorationOptions?.finished !== undefined) {
+            this._finished = restorationOptions.finished
+        }
+        
+        // Restore guesses if provided
+        if (restorationOptions?.initialGuesses) {
+            // For default games, flatten all player guesses into the single array
+            for (const [playerId, playerGuesses] of restorationOptions.initialGuesses) {
+                this.guesses.push(...playerGuesses)
+            }
+        }
+        
+        // Default games start immediately unless restoration says otherwise
+        if (!restorationOptions?.started) {
+            this.started = true
+        }
     }
 
     removePlayer(playerId: string): void {
@@ -44,6 +61,9 @@ class ContextoDefaultGame extends ContextoBaseGame {
 
         // Add the guess to the game
         this.guesses.push(guess)
+        
+        // Notify manager for persistence
+        this.notifyGuessAdded()
     }
 
     getExistingGuess(word: string): Guess | undefined {

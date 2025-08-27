@@ -1,5 +1,5 @@
 import { AxiosError } from 'axios'
-import { GameState, GameWord, Guess } from './interface'
+import { GameState, GameWord, Guess, GameRestorationOptions } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -10,16 +10,23 @@ class ContextoStopGame extends ContextoBaseGame {
     private submissionTimestamps = new Map<string, Date>() // Track submission order
     finished = false
 
-    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        super(playerId, manager, gameIdOrDate)
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date, restorationOptions?: GameRestorationOptions) {
+        super(playerId, manager, gameIdOrDate, restorationOptions)
         
         // Stop game specific settings
         this.allowTips = false // No tips in stop mode
         this.allowGiveUp = true // Can give up (leaves room)
-        this.started = false // Stop games start unstarted - must be explicitly started
         
-        // Initialize empty guess array for the first player
-        this.playerGuesses.set(playerId, [])
+        // Restore guesses if provided, otherwise initialize empty for the first player
+        if (restorationOptions?.initialGuesses) {
+            this.playerGuesses = new Map(restorationOptions.initialGuesses)
+        } else if (!restorationOptions?.skipPlayerInit) {
+            // Initialize empty guess array for the first player only if not skipping player init
+            this.playerGuesses.set(playerId, [])
+        }
+        
+        // Stop games start unstarted unless restoration says otherwise
+        this.started = restorationOptions?.started || false
     }
 
     // Check if the game can be started (only if not started and has players)
@@ -84,6 +91,9 @@ class ContextoStopGame extends ContextoBaseGame {
         }
         
         playerGuesses.push(guess)
+        
+        // Notify manager for persistence
+        this.notifyGuessAdded()
     }
 
     // Get existing guess from player's personal guesses

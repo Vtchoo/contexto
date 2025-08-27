@@ -1,5 +1,5 @@
 import { getTodaysGameId } from './utils/misc'
-import { GameWord, IGame } from './interface'
+import { GameWord, IGame, Guess, GameRestorationOptions } from './interface'
 import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
 import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
@@ -7,6 +7,8 @@ import { ContextoStopGame } from './ContextoStopGame'
 import { ContextoBattleRoyaleGame } from './ContextoBattleRoyaleGame'
 import GameApi from './gameApi'
 import { getPrefetchedGamesRepository } from '../repositories/PrefetchedGamesRepository'
+import { gamePersistenceService } from './GamePersistenceService'
+import { GameMode } from '../models/Game'
 
 class ContextoManager {
 
@@ -59,6 +61,10 @@ class ContextoManager {
         this.games.set(game.id, game)
         this.playerGames.set(playerId, game.id)
         this.prefetchClosestWords(game.gameId)
+        
+        // Schedule initial save for new game
+        this.scheduleGameSave(game)
+        
         return game
     }
 
@@ -113,7 +119,7 @@ class ContextoManager {
     }
 
     // Unified method to join any game by ID
-    public joinGame(playerId: string, gameInstanceId: string): IGame {
+    public async joinGame(playerId: string, gameInstanceId: string): Promise<IGame> {
         // Check if player is already in a game
         const currentGame = this.getCurrentPlayerGame(playerId)
         if (currentGame) {
@@ -121,11 +127,11 @@ class ContextoManager {
                 return currentGame // Already in this game
             }
             // Leave current game first
-            this.leaveCurrentGame(playerId)
+            await this.leaveCurrentGame(playerId)
         }
 
         // Find the game by ID
-        const gameInfo = this.getGameInfo(gameInstanceId)
+        const gameInfo = await this.getGameInfo(gameInstanceId, playerId)
         if (!gameInfo.exists || !gameInfo.game) {
             throw new Error(`Game with ID ${gameInstanceId} not found`)
         }
@@ -144,15 +150,41 @@ class ContextoManager {
         // Add player to the game
         game.addPlayer(playerId)
         this.playerGames.set(playerId, game.id)
+        
+        // Schedule save after player joins
+        this.scheduleGameSave(game)
+        
         return game
     }
 
     // Unified method to get any game by ID
-    public getGameInfo(gameInstanceId: string): { game: IGame | null; exists: boolean } {
-        const game = this.games.get(gameInstanceId)
+    public async getGameInfo(gameInstanceId: string, requestingPlayerId?: string): Promise<{ game: IGame | null; exists: boolean }> {
+        // First check if game is already in memory
+        const memoryGame = this.games.get(gameInstanceId)
+        if (memoryGame) {
+            return {
+                game: memoryGame,
+                exists: true
+            }
+        }
+
+        // If not in memory, try loading from database
+        try {
+            const loadedGameData = await gamePersistenceService.loadGame(gameInstanceId)
+            if (loadedGameData) {
+                const game = await this.restoreGameFromDatabase(loadedGameData.game, loadedGameData.guesses, requestingPlayerId)
+                return {
+                    game,
+                    exists: true
+                }
+            }
+        } catch (error) {
+            console.error(`Error loading game ${gameInstanceId} from database:`, error)
+        }
+
         return {
-            game: game || null,
-            exists: !!game
+            game: null,
+            exists: false
         }
     }
 
@@ -251,20 +283,223 @@ class ContextoManager {
             const game = this.games.get(gameId)
             if (game) {
                 game.removePlayer(playerId)
+                
+                // Check if no players left in the game
+                if (game.getPlayerCount() === 0) {
+                    this.unloadGame(gameId)
+                } else {
+                    // Schedule save after player leaves
+                    this.scheduleGameSave(game)
+                }
             }
         }
         this.playerGames.delete(playerId)
     }
 
+    /**
+     * Schedule a game save operation
+     */
+    private scheduleGameSave(game: IGame): void {
+        const saveCallback = async () => {
+            await this.saveGameToDatabase(game)
+        }
+        gamePersistenceService.scheduleInactivitySave(game.id, saveCallback)
+    }
+
+    /**
+     * Check if we should save based on guess count and trigger save if needed
+     */
+    public async onGuessAdded(game: IGame): Promise<void> {
+        if (gamePersistenceService.shouldSaveOnGuessCount(game.id)) {
+            await this.saveGameToDatabase(game)
+        } else {
+            // Just schedule the inactivity save
+            this.scheduleGameSave(game)
+        }
+    }
+
+    /**
+     * Save a game to the database
+     */
+    private async saveGameToDatabase(game: IGame): Promise<void> {
+        try {
+            const gameMode = this.getGameMode(game)
+            const guesses = this.getGameGuesses(game)
+
+            await gamePersistenceService.saveGame(
+                game.id,
+                game.gameId,
+                gameMode,
+                game.started,
+                game.finished,
+                game.allowTips,
+                game.allowGiveUp,
+                guesses
+            )
+        } catch (error) {
+            console.error(`Failed to save game ${game.id}:`, error)
+        }
+    }
+
+    /**
+     * Restore a game from database data
+     */
+    private async restoreGameFromDatabase(gameData: any, guessesData: any[], requestingPlayerId?: string): Promise<IGame> {
+        // Prepare guesses by player for restoration
+        const playerGuesses = new Map<string, Guess[]>()
+        for (const guessData of guessesData) {
+            const guess: Guess = {
+                word: guessData.word,
+                lemma: guessData.lemma,
+                distance: guessData.distance,
+                addedBy: guessData.addedBy,
+                error: guessData.error,
+                hidden: guessData.hidden
+            }
+
+            if (!playerGuesses.has(guessData.addedBy)) {
+                playerGuesses.set(guessData.addedBy, [])
+            }
+            playerGuesses.get(guessData.addedBy)!.push(guess)
+        }
+
+        // Prepare restoration options
+        const restorationOptions: GameRestorationOptions = {
+            id: gameData.id,
+            started: gameData.started,
+            finished: gameData.finished,
+            skipPlayerInit: !requestingPlayerId, // Skip player init if no requesting player
+            initialGuesses: playerGuesses
+        }
+
+        // Create the appropriate game instance based on gameMode with restoration options
+        let game: IGame
+        const firstPlayerId = requestingPlayerId || '__restoration__' // Use requesting player or placeholder
+        
+        switch (gameData.gameMode) {
+            case 'competitive':
+                game = new ContextoCompetitiveGame(firstPlayerId, this, gameData.gameId, restorationOptions)
+                break
+            case 'stop':
+                game = new ContextoStopGame(firstPlayerId, this, gameData.gameId, restorationOptions)
+                break
+            case 'battle-royale':
+                game = new ContextoBattleRoyaleGame(firstPlayerId, this, gameData.gameId, restorationOptions)
+                break
+            case 'default':
+            case 'coop':
+            default:
+                game = new ContextoDefaultGame(firstPlayerId, this, gameData.gameId, restorationOptions)
+        }
+
+        // Restore winner info for competitive games (this still needs to be set externally)
+        if (gameData.winnerInfo && (game instanceof ContextoCompetitiveGame || game instanceof ContextoStopGame)) {
+            (game as any).winnerInfo = gameData.winnerInfo
+        }
+
+        // Add to memory
+        this.games.set(game.id, game)
+        
+        console.log(`Game ${game.id} restored from database with ${guessesData.length} guesses`)
+        return game
+    }
+
+    /**
+     * Unload a game from memory (save first if needed)
+     */
+    private async unloadGame(gameId: string): Promise<void> {
+        const game = this.games.get(gameId)
+        if (!game) return
+
+        try {
+            // Force save before unloading
+            const saveCallback = async () => {
+                await this.saveGameToDatabase(game)
+            }
+            await gamePersistenceService.forceSaveAndCleanup(gameId, saveCallback)
+
+            // Remove from memory
+            this.games.delete(gameId)
+            
+            // Clean up player mappings
+            for (const [playerId, playerGameId] of this.playerGames) {
+                if (playerGameId === gameId) {
+                    this.playerGames.delete(playerId)
+                }
+            }
+
+            console.log(`Game ${gameId} unloaded from memory`)
+        } catch (error) {
+            console.error(`Error unloading game ${gameId}:`, error)
+        }
+    }
+
+    /**
+     * Helper methods to extract game data for persistence
+     */
+    private getGameMode(game: IGame): GameMode {
+        if (game instanceof ContextoCompetitiveGame) return 'competitive'
+        if (game instanceof ContextoStopGame) return 'stop'
+        if (game instanceof ContextoBattleRoyaleGame) return 'battle-royale'
+        return 'default'
+    }
+
+    private getGameGuesses(game: IGame): Map<string, Guess[]> {
+        // Handle different game types with different guess storage structures
+        if ((game as any).playerGuesses) {
+            // Competitive games store playerGuesses as Map<string, Guess[]>
+            return (game as any).playerGuesses
+        } else if ((game as any).guesses) {
+            // Default/cooperative games store guesses as Guess[]
+            const guessesArray = (game as any).guesses as Guess[]
+            const playerGuessesMap = new Map<string, Guess[]>()
+            
+            // Group guesses by player
+            for (const guess of guessesArray) {
+                if (!playerGuessesMap.has(guess.addedBy)) {
+                    playerGuessesMap.set(guess.addedBy, [])
+                }
+                playerGuessesMap.get(guess.addedBy)!.push(guess)
+            }
+            
+            return playerGuessesMap
+        }
+        
+        return new Map()
+    }
+
     // Initialize the manager and start cleanup tasks
     public async initialize(): Promise<void> {
         // Database cache is kept permanently - no cleanup needed
-        console.log('ContextoManager initialized')
+        console.log('ContextoManager initialized with database persistence')
     }
 
     // Clean up memory cache periodically
     public clearMemoryCache(): void {
         this.memoryCache.clear()
+    }
+
+    // Cleanup method for graceful shutdown
+    public async shutdown(): Promise<void> {
+        console.log('ContextoManager shutting down...')
+        
+        // Save all active games before shutdown
+        const savePromises: Promise<void>[] = []
+        for (const game of this.games.values()) {
+            savePromises.push(this.saveGameToDatabase(game))
+        }
+        
+        try {
+            await Promise.all(savePromises)
+            console.log(`Saved ${savePromises.length} games before shutdown`)
+        } catch (error) {
+            console.error('Error saving games during shutdown:', error)
+        }
+        
+        // Cleanup persistence service timers
+        gamePersistenceService.cleanup()
+        
+        console.log('ContextoManager shutdown complete')
     }
 
     // Convenience method to create a game for a specific date
@@ -285,8 +520,8 @@ class ContextoManager {
     }
 
     // Legacy methods for backward compatibility - internally use getGameInfo
-    public getCompetitiveGameInfo(gameInstanceId: string): { game: ContextoCompetitiveGame; exists: boolean } {
-        const result = this.getGameInfo(gameInstanceId)
+    public async getCompetitiveGameInfo(gameInstanceId: string): Promise<{ game: ContextoCompetitiveGame; exists: boolean }> {
+        const result = await this.getGameInfo(gameInstanceId)
         const isCompetitive = result.game instanceof ContextoCompetitiveGame
         return {
             game: isCompetitive ? result.game as ContextoCompetitiveGame : null!,
@@ -294,8 +529,8 @@ class ContextoManager {
         }
     }
 
-    public getCooperativeGameInfo(gameInstanceId: string): { game: ContextoDefaultGame; exists: boolean } {
-        const result = this.getGameInfo(gameInstanceId)
+    public async getCooperativeGameInfo(gameInstanceId: string): Promise<{ game: ContextoDefaultGame; exists: boolean }> {
+        const result = await this.getGameInfo(gameInstanceId)
         const isCooperative = result.game instanceof ContextoDefaultGame
         return {
             game: isCooperative ? result.game as ContextoDefaultGame : null!,
@@ -303,8 +538,8 @@ class ContextoManager {
         }
     }
 
-    public getStopGameInfo(gameInstanceId: string): { game: ContextoStopGame; exists: boolean } {
-        const result = this.getGameInfo(gameInstanceId)
+    public async getStopGameInfo(gameInstanceId: string): Promise<{ game: ContextoStopGame; exists: boolean }> {
+        const result = await this.getGameInfo(gameInstanceId)
         const isStop = result.game instanceof ContextoStopGame
         return {
             game: isStop ? result.game as ContextoStopGame : null!,
@@ -312,8 +547,8 @@ class ContextoManager {
         }
     }
 
-    public getBattleRoyaleGameInfo(gameInstanceId: string): { game: ContextoBattleRoyaleGame; exists: boolean } {
-        const result = this.getGameInfo(gameInstanceId)
+    public async getBattleRoyaleGameInfo(gameInstanceId: string): Promise<{ game: ContextoBattleRoyaleGame; exists: boolean }> {
+        const result = await this.getGameInfo(gameInstanceId)
         const isBattleRoyale = result.game instanceof ContextoBattleRoyaleGame
         return {
             game: isBattleRoyale ? result.game as ContextoBattleRoyaleGame : null!,

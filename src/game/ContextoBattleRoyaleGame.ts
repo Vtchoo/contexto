@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios'
 import { halfTipDistance } from './utils/misc'
-import { GameState, GameWord, Guess, PlayerScore } from './interface'
+import { GameState, GameWord, Guess, PlayerScore, GameRestorationOptions } from './interface'
 import type { ContextoManager } from './ContextoManager'
 import { ContextoBaseGame } from './ContextoBaseGame'
 
@@ -20,16 +20,32 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
     finished = false
     private winner: PlayerScore | null = null
 
-    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date) {
-        super(playerId, manager, gameIdOrDate)
+    constructor(playerId: string, manager: ContextoManager, gameIdOrDate?: number | string | Date, restorationOptions?: GameRestorationOptions) {
+        super(playerId, manager, gameIdOrDate, restorationOptions)
         
         // Battle Royale specific settings
         this.allowTips = true
         this.allowGiveUp = true
-        this.started = false
         
-        // Initialize empty guess array for the first player
-        this.playerGuesses.set(playerId, [])
+        // Restore guesses if provided, otherwise initialize empty for the first player
+        if (restorationOptions?.initialGuesses) {
+            this.playerGuesses = new Map(restorationOptions.initialGuesses)
+            // Rebuild used words/lemmas from restored guesses
+            for (const guesses of this.playerGuesses.values()) {
+                for (const guess of guesses) {
+                    this.usedWords.add(guess.word.toLowerCase())
+                    if (guess.lemma) {
+                        this.usedLemmas.add(guess.lemma.toLowerCase())
+                    }
+                }
+            }
+        } else if (!restorationOptions?.skipPlayerInit) {
+            // Initialize empty guess array for the first player only if not skipping player init
+            this.playerGuesses.set(playerId, [])
+        }
+        
+        // Battle Royale games start unstarted unless restoration says otherwise
+        this.started = restorationOptions?.started || false
     }
 
     // Override startGame from base class
@@ -100,6 +116,9 @@ class ContextoBattleRoyaleGame extends ContextoBaseGame {
                 this.usedLemmas.add(guess.lemma.toLowerCase())
             }
         }
+        
+        // Notify manager for persistence
+        this.notifyGuessAdded()
     }
 
     // Check if word/lemma has been used by any player

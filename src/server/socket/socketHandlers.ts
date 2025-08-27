@@ -96,7 +96,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const game = gameManager.getGame(roomId)
+        const game = await gameManager.getGame(roomId)
         if (!game) {
           socket.emit('error', { error: `Room ${roomId} not found` })
           return
@@ -114,7 +114,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         socket.join(roomId)
 
         // Add user to game
-        gameManager.joinGame(socketUser.userId, roomId)
+        await gameManager.joinGame(socketUser.userId, roomId)
 
         // Update user's current room
         if (user) {
@@ -213,7 +213,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
-        const game = gameManager.getGame(roomId)
+        const game = await gameManager.getGame(roomId)
         if (!game) {
           socket.emit('error', { error: 'Game not found' })
           return
@@ -290,7 +290,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         const roomId = currentRoom
-        const game = gameManager.getGame(roomId)
+        const game = await gameManager.getGame(roomId)
         if (!game) {
           socket.emit('error', { error: 'Game not found' })
           return
@@ -338,7 +338,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         const { count = 10 } = data
         const roomId = currentRoom
 
-        const game = gameManager.getGame(roomId)
+        const game = await gameManager.getGame(roomId)
         if (!game) {
           socket.emit('error', { error: 'Game not found' })
           return

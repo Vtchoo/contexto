@@ -68,8 +68,8 @@ export class UserManager {
   }
 
   // Room management methods
-  joinUserToRoom(userId: string, roomId: string): void {
-    this.gameManager.joinGame(userId, roomId)
+  async joinUserToRoom(userId: string, roomId: string): Promise<void> {
+    await this.gameManager.joinGame(userId, roomId)
   }
 
   removeUserFromRoom(userId: string): void {

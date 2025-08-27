@@ -26,13 +26,13 @@ export class GameManager {
     return game.id
   }
 
-  getGame(roomId: string): Game | null {
-    const gameInfo = this.contextoManager.getGameInfo(roomId)
+  async getGame(roomId: string): Promise<Game | null> {
+    const gameInfo = await this.contextoManager.getGameInfo(roomId)
     return gameInfo.exists ? gameInfo.game : null
   }
 
-  deleteGame(roomId: string): boolean {
-    const gameInfo = this.contextoManager.getGameInfo(roomId)
+  async deleteGame(roomId: string): Promise<boolean> {
+    const gameInfo = await this.contextoManager.getGameInfo(roomId)
     if (!gameInfo.exists) return false
 
     // Note: ContextoManager doesn't have a public delete method
@@ -40,8 +40,8 @@ export class GameManager {
     return true
   }
 
-  joinGame(userId: string, roomId: string): Game {
-    return this.contextoManager.joinGame(userId, roomId)
+  async joinGame(userId: string, roomId: string): Promise<Game> {
+    return await this.contextoManager.joinGame(userId, roomId)
   }
 
   removeUserFromGame(userId: string, roomId: string): void {
