@@ -1,7 +1,11 @@
 import dotenv from 'dotenv'
 import zod from 'zod'
+import path from 'path'
 
-dotenv.config()
+// Look for .env file in the monorepo root, not the package directory
+dotenv.config({ 
+    path: path.resolve(__dirname, '../../../.env') 
+})
 
 const parser = zod.object({
     // Discord Bot (optional for web-only deployment)

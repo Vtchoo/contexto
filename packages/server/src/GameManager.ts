@@ -4,9 +4,9 @@ import {
   ContextoBattleRoyaleGame, 
   ContextoStopGame, 
   ContextoManager,
-  IGame 
+  IGame,
+  snowflakeGenerator
 } from '@contexto/core'
-import snowflakeGenerator from '@contexto/core/utils/snowflake'
 
 export type Game = IGame
 

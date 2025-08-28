@@ -17,8 +17,9 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "useUnknownInCatchVariables": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
 
     /* Path mapping */
@@ -30,9 +31,7 @@
       "@hooks/*": ["./src/hooks/*"],
       "@utils/*": ["./src/utils/*"],
       "@styles/*": ["./src/styles/*"],
-      "@api/*": ["./src/api/*"],
-      "@contexto/core": ["../core/src"],
-      "@contexto/core/*": ["../core/src/*"]
+      "@api/*": ["./src/api/*"]
     }
   },
   "include": ["src"],

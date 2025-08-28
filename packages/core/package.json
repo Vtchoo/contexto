@@ -4,6 +4,20 @@
   "description": "Core shared functionality for Contexto game",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils-only.d.ts",
+      "default": "./dist/utils-only.js"
+    },
+    "./browser": {
+      "types": "./dist/browser-utils.d.ts",
+      "default": "./dist/browser-utils.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

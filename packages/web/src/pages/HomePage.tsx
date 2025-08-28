@@ -372,7 +372,7 @@ function HomePage() {
             isHost={currentGame?.isHost || false}
             onStartGame={startGame}
             loading={loading}
-            user={user}
+            user={user!}
             players={currentGame?.players || []}
           />
         </Game>

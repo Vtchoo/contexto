@@ -1,8 +1,5 @@
 import Discord, { GuildMember } from 'discord.js'
-import { UserRole } from '../models/GuildMember'
-import { getUsersRepository } from '../repositories/GuildMembersRepository'
-import { getGuildsRepository } from '../repositories/GuildsRepository'
-import { Guild } from '../models/Guild'
+import { UserRole, getUsersRepository, getGuildsRepository, Guild } from "@contexto/core"
 
 class Bot {
     

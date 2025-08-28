@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto'
+
 /**
  * Snowflake ID Generator
  * Generates short, unique, user-friendly IDs for game rooms
@@ -29,10 +31,9 @@ class SnowflakeGenerator {
     
     constructor() {
         // Generate a random machine ID (1-MAX_MACHINE_ID) with better distribution
-        // Use crypto random if available, fall back to Math.random
-        const randomValue = typeof crypto !== 'undefined' && crypto.getRandomValues 
-            ? crypto.getRandomValues(new Uint32Array(1))[0] / (0xFFFFFFFF + 1)
-            : Math.random()
+        // Use Node.js crypto for better randomness
+        const randomBytes = require('crypto').randomBytes(4)
+        const randomValue = randomBytes.readUInt32BE(0) / (0xFFFFFFFF + 1)
             
         // Ensure machine ID is never 0 to avoid always starting with same base
         this.machineId = Math.floor(randomValue * SnowflakeGenerator.MAX_MACHINE_ID) + 1

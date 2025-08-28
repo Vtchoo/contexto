@@ -1,7 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
-import snowflakeGenerator from "../utils/snowflake"
+import { gameManager, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame, snowflakeGenerator } from "@contexto/core"
 
 class RoomCommand implements ICommand {
 
@@ -22,7 +21,7 @@ class RoomCommand implements ICommand {
             const game = await this.findGame(roomId, playerId, interaction)
             if (!game) return // Error already handled in findGame
 
-            await this.showRoomInfo(interaction, game, roomId)
+            await this.showRoomInfo(interaction, game as ContextoCompetitiveGame | ContextoDefaultGame | ContextoStopGame | ContextoBattleRoyaleGame, roomId)
         } catch (error) {
             await interaction.reply({
                 content: `❌ Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,

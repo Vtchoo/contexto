@@ -1,7 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame } from "../game"
-import { getBarColor, getBarWidth, getTodaysGameId } from "../game/utils/misc"
+import { gameManager, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoBattleRoyaleGame, getBarColor, getBarWidth, getTodaysGameId } from "@contexto/core"
 import { parseISO } from "date-fns"
 
 const TOTAL_BAR_WIDTH = 30 // Total width of the bar in characters

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame } from "../game"
+import { gameManager, ContextoCompetitiveGame } from "@contexto/core"
 
 class LeaveCommand implements ICommand {
 

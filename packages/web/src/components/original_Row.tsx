@@ -1,5 +1,5 @@
 import { useGame } from '@/contexts/GameContext';
-import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '../../../utils/misc';
+import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '@/utils/sharedUtils';
 import { PlayerAvatar } from './PlayerAvatar';
 
 const getBarWidth = (distance: number) => {

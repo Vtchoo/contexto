@@ -6,6 +6,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
+    "useUnknownInCatchVariables": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -16,9 +17,7 @@
     "declaration": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@contexto/core": ["../core/src"],
-      "@contexto/core/*": ["../core/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],

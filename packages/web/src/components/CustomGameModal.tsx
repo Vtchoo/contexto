@@ -2,7 +2,7 @@
 import { GameMode } from '@/api/gameApi';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import styled, { css, keyframes } from 'styled-components';
-import { getTodaysGameId } from '../../../utils/misc';
+import { getTodaysGameId } from '@/utils/sharedUtils';
 
 interface CustomGameModalProps {
   isOpen: boolean;

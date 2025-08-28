@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js"
 import { CommandHandlerParams, ICommand } from "../types"
-import gameManager, { ContextoCompetitiveGame, ContextoDefaultGame } from "../game"
+import { gameManager, ContextoCompetitiveGame, ContextoDefaultGame } from "@contexto/core"
 
 class GiveUpCommand implements ICommand {
 
