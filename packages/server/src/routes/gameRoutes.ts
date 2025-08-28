@@ -1,10 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
-import { Player } from '../../models/Player'
-import snowflakeGenerator from '../../utils/snowflake'
-import JWTService from '../../utils/jwt'
-import { getTodaysGameId } from '../../utils/misc'
+import { Player, snowflakeGenerator, JWTService, getTodaysGameId } from '@contexto/core'
 
 // Extend Express Request interface
 declare global {

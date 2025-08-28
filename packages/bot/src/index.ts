@@ -1,11 +1,9 @@
 import 'reflect-metadata'
 import fs from 'fs'
-import env from '../env'
+import { env, createConnection, gameManager } from '@contexto/core'
 import Discord, { AuditLogEvent, Client, EmbedBuilder, Events, GatewayIntentBits, GuildAuditLogs, GuildAuditLogsEntry } from 'discord.js'
 import { ICommand } from './types'
-import createConnection from './database'
 import bot from './core/Bot'
-import gameManager from './game'
 import { format } from 'date-fns'
 
 async function startClient() {

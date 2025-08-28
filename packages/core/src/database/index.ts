@@ -1,4 +1,4 @@
-import dataSource from '../../dataSource'
+import dataSource from './dataSource'
 
 async function createConnection() {
     await dataSource.initialize()
@@ -6,3 +6,4 @@ async function createConnection() {
 }
 
 export default createConnection
+export { dataSource }

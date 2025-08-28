@@ -1,5 +1,5 @@
 import { Repository } from "typeorm"
-import dataSource from "../../dataSource"
+import { dataSource } from "../database"
 import { Player } from "../models/Player"
 
 let playerRepository: Repository<Player>

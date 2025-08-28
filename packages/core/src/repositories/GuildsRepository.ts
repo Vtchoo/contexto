@@ -1,4 +1,4 @@
-import dataSource from '../../dataSource'
+import { dataSource } from '../database'
 import { Guild } from '../models/Guild'
 
 function getGuildsRepository() {

@@ -1,4 +1,4 @@
-import dataSource from '../../dataSource'
+import { dataSource } from '../database'
 import { CachedWord } from '../models/CachedWord'
 
 function getCachedWordsRepository() {

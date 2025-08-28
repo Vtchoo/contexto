@@ -1,10 +1,12 @@
-import { ContextoDefaultGame } from '../game/ContextoDefaultGame'
-import { ContextoCompetitiveGame } from '../game/ContextoCompetitiveGame'
-import { ContextoBattleRoyaleGame } from '../game/ContextoBattleRoyaleGame'
-import { ContextoStopGame } from '../game/ContextoStopGame'
-import { ContextoManager } from '../game/ContextoManager'
-import snowflakeGenerator from '../utils/snowflake'
-import { IGame } from '../game/interface'
+import { 
+  ContextoDefaultGame, 
+  ContextoCompetitiveGame, 
+  ContextoBattleRoyaleGame, 
+  ContextoStopGame, 
+  ContextoManager,
+  IGame 
+} from '@contexto/core'
+import snowflakeGenerator from '@contexto/core/utils/snowflake'
 
 export type Game = IGame
 

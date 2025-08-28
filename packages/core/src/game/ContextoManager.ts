@@ -1,4 +1,4 @@
-import { getTodaysGameId } from './utils/misc'
+import { getTodaysGameId } from '../utils/misc'
 import { GameWord, IGame } from './interface'
 import { getCachedWordsRepository } from '../repositories/CachedWordsRepository'
 import { ContextoDefaultGame } from './ContextoDefaultGame'
@@ -95,7 +95,7 @@ class ContextoManager {
                 console.log(`All words for game ${gameId} are already cached, skipping prefetch`)
                 return
             }
-            await repository.save(newWords.map((word: string, index) => ({
+            await repository.save(newWords.map((word: string, index: number) => ({
                 gameId,
                 word: word,
                 lemma: word,

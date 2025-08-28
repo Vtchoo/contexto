@@ -1,11 +1,16 @@
 import { Server, Socket } from 'socket.io'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
-import { Player } from '../../models/Player'
-import snowflakeGenerator from '../../utils/snowflake'
-import JWTService from '../../utils/jwt'
-import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from '../../game'
-import { IGame } from '../../game/interface'
+import { 
+  Player, 
+  snowflakeGenerator, 
+  JWTService,
+  ContextoBattleRoyaleGame, 
+  ContextoCompetitiveGame, 
+  ContextoDefaultGame, 
+  ContextoStopGame,
+  IGame 
+} from '@contexto/core'
 import * as zod from 'zod'
 
 interface SocketUser {

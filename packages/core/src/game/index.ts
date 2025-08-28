@@ -8,3 +8,4 @@ const gameManager = new ContextoManager()
 
 export default gameManager
 export { ContextoDefaultGame, ContextoCompetitiveGame, ContextoStopGame, ContextoBattleRoyaleGame, ContextoManager }
+export * from './interface'

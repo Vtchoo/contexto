@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
-import snowflakeGenerator from '../../utils/snowflake'
-import { ContextoDefaultGame } from '../../game/ContextoDefaultGame'
-import { ContextoCompetitiveGame } from '../../game/ContextoCompetitiveGame'
-import { ContextoBattleRoyaleGame } from '../../game/ContextoBattleRoyaleGame'
+import { 
+  snowflakeGenerator, 
+  ContextoDefaultGame, 
+  ContextoCompetitiveGame, 
+  ContextoBattleRoyaleGame 
+} from '@contexto/core'
 
 export function setupRoomRoutes(gameManager: GameManager, userManager: UserManager) {
   const router = Router()

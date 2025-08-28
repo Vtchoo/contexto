@@ -1,7 +1,4 @@
-import { Player } from '../models/Player'
-import { getPlayerRepository } from '../repositories/PlayersRepository'
-import snowflakeGenerator from '../utils/snowflake'
-import JWTService from '../utils/jwt'
+import { Player, getPlayerRepository, snowflakeGenerator, JWTService } from '@contexto/core'
 import { GameManager } from './GameManager'
 
 export class UserManager {

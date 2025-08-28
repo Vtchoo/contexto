@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import env from '../../env'
+import env from '../env'
 
 // JWT secret from environment variables
 const JWT_SECRET = env.JWT_SECRET

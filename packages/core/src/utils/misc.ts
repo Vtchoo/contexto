@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 
-const cleanInput = (value) => value.toLowerCase().trim();
+const cleanInput = (value: string) => value.toLowerCase().trim();
 
 const PT_START_DATE = '2022-02-23';
 const EN_START_DATE = '2022-09-18';
@@ -9,12 +9,14 @@ const ES_START_DATE = '2023-05-26';
 const GREEN_THRESHOLD = 300;
 const YELLOW_THRESHOLD = 1500;
 
-const randomTipDistance = (guessHistory) => {
+type GuessHistoryItem = [string, number]; // [word, distance]
+
+const randomTipDistance = (guessHistory: GuessHistoryItem[]) => {
 	const maxDistance = GREEN_THRESHOLD - 1;
 	let tipDistance = Math.floor(Math.random() * maxDistance - 1) + 1;
 
 	if (guessHistory.length > 0) {
-		const distances = guessHistory.map((guess) => guess[1]);
+		const distances = guessHistory.map((guess: GuessHistoryItem) => guess[1]);
 		while (distances.includes(tipDistance)) {
 			tipDistance = Math.floor(Math.random() * maxDistance - 1) + 1;
 		}
@@ -22,12 +24,12 @@ const randomTipDistance = (guessHistory) => {
 	return tipDistance;
 };
 
-const nextTipDistance = (guessHistory) => {
+const nextTipDistance = (guessHistory: GuessHistoryItem[]) => {
 	let tipDistance = GREEN_THRESHOLD - 1;
 	let lowestDistance = tipDistance;
 
 	if (guessHistory.length > 0) {
-		const distances = guessHistory.map((guess) => guess[1]);
+		const distances = guessHistory.map((guess: GuessHistoryItem) => guess[1]);
 		lowestDistance = Math.min(...distances, lowestDistance);
 		if (lowestDistance > 1) {
 			tipDistance = lowestDistance - 1;
@@ -42,12 +44,12 @@ const nextTipDistance = (guessHistory) => {
 	return tipDistance;
 };
 
-const halfTipDistance = (guessHistory) => {
+const halfTipDistance = (guessHistory: GuessHistoryItem[]) => {
 	let tipDistance = GREEN_THRESHOLD - 1;
 	let lowestDistance = 2 * tipDistance;
 
 	if (guessHistory.length > 0) {
-		const distances = guessHistory.map((guess) => guess[1]);
+		const distances = guessHistory.map((guess: GuessHistoryItem) => guess[1]);
 		lowestDistance = Math.min(...distances, lowestDistance);
 		if (lowestDistance > 1) {
 			tipDistance = Math.floor(lowestDistance / 2);
@@ -89,7 +91,7 @@ const getTodaysGameId = (language?: string) => {
 const getBarWidth = (distance: number) => {
     const total = 40000
     const lambda = 0.5
-    const pdf = (x) => lambda * Math.exp(-lambda * x)
+    const pdf = (x: number) => lambda * Math.exp(-lambda * x)
     const startX = 0
     const endX = 100
     const startY = pdf(startX)

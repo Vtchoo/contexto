@@ -30,7 +30,9 @@
       "@hooks/*": ["./src/hooks/*"],
       "@utils/*": ["./src/utils/*"],
       "@styles/*": ["./src/styles/*"],
-      "@api/*": ["./src/api/*"]
+      "@api/*": ["./src/api/*"],
+      "@contexto/core": ["../core/src"],
+      "@contexto/core/*": ["../core/src/*"]
     }
   },
   "include": ["src"],

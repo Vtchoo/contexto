@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { UserManager } from '../UserManager'
-import { Player } from '../../models/Player'
+import { Player } from '@contexto/core'
 import * as zod from 'zod'
 
 export function setupUserRoutes(userManager: UserManager) {

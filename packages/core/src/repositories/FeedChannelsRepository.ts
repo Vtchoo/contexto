@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm'
-import dataSource from '../../dataSource'
+import { dataSource } from '../database'
 import { FeedChannel } from '../models/FeedChannel'
 
 function getFeedChannelsRepository(manager?: EntityManager) {
