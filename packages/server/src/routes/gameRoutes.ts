@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express'
 import { GameManager } from '../GameManager'
 import { UserManager } from '../UserManager'
 import { Player, snowflakeGenerator, JWTService, getTodaysGameId } from '@contexto/core'
+import type { GameMode } from '@contexto/shared'
+import { ERROR_MESSAGES } from '@contexto/shared'
 
 // Extend Express Request interface
 declare global {
@@ -22,18 +24,19 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const { type, allowTips, allowGiveUp, maxPlayers } = req.body
       let gameId: number | Date | 'random' | undefined = req.body.gameId
 
-      if (!['default', 'competitive', 'battle-royale', 'stop'].includes(type)) {
+      const validGameModes: GameMode[] = ['default', 'competitive', 'battle-royale', 'stop']
+      if (!validGameModes.includes(type)) {
         return res.status(400).json({ error: 'Invalid game type' })
       }
 
       if (!req.user) {
-        return res.status(401).json({ error: 'User not authenticated' })
+        return res.status(401).json({ error: ERROR_MESSAGES.USER_NOT_FOUND })
       }
 
       const user = await userManager.getUserById(req.user.id)
 
       if (!user) {
-        return res.status(401).json({ error: 'User not found' })
+        return res.status(401).json({ error: ERROR_MESSAGES.USER_NOT_FOUND })
       }
 
       if (gameId === 'random') {
@@ -66,16 +69,16 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const token = req.userToken!
 
       if (!snowflakeGenerator.isValid(roomId)) {
-        return res.status(400).json({ error: 'Invalid room ID' })
+        return res.status(400).json({ error: ERROR_MESSAGES.INVALID_ROOM_ID })
       }
 
       const game = gameManager.getGame(roomId)
       if (!game) {
-        return res.status(404).json({ error: 'Game not found' })
+        return res.status(404).json({ error: ERROR_MESSAGES.GAME_NOT_FOUND })
       }
 
       if (game.finished) {
-        return res.status(400).json({ error: 'Game has already finished' })
+        return res.status(400).json({ error: ERROR_MESSAGES.GAME_ALREADY_FINISHED })
       }
 
       gameManager.joinGame(token, roomId)
@@ -105,7 +108,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const token = req.userToken!
 
       if (!snowflakeGenerator.isValid(roomId)) {
-        return res.status(400).json({ error: 'Invalid room ID' })
+        return res.status(400).json({ error: ERROR_MESSAGES.INVALID_ROOM_ID })
       }
 
       if (!word || typeof word !== 'string') {
@@ -114,11 +117,11 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
 
       const game = gameManager.getGame(roomId)
       if (!game) {
-        return res.status(404).json({ error: 'Game not found' })
+        return res.status(404).json({ error: ERROR_MESSAGES.GAME_NOT_FOUND })
       }
 
       if (game.finished) {
-        return res.status(400).json({ error: 'Game has already finished' })
+        return res.status(400).json({ error: ERROR_MESSAGES.GAME_ALREADY_FINISHED })
       }
 
       const guess = await game.tryWord(token, word.trim().toLowerCase())
@@ -155,12 +158,12 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const userId = req.userToken!
 
       if (!snowflakeGenerator.isValid(roomId)) {
-        return res.status(400).json({ error: 'Invalid room ID' })
+        return res.status(400).json({ error: ERROR_MESSAGES.INVALID_ROOM_ID })
       }
 
       const game = gameManager.getGame(roomId)
       if (!game) {
-        return res.status(404).json({ error: 'Game not found' })
+        return res.status(404).json({ error: ERROR_MESSAGES.GAME_NOT_FOUND })
       }
 
       const closestGuesses = game.getClosestGuesses(userId, Number(count))

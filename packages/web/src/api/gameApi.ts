@@ -1,4 +1,14 @@
 import axios from 'axios'
+import type { 
+  GameMode, 
+  Player, 
+  Guess, 
+  GameRoom, 
+  CreateGameOptions, 
+  CreateGameResponse, 
+  GuessResponse, 
+  RoomInfo 
+} from '@contexto/shared'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001')
@@ -9,70 +19,17 @@ const api = axios.create({
   withCredentials: true, // Important for cookie-based auth
 })
 
-// Types
-
-export type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
-
-export interface Player {
-  id: string
-  username?: string
-  gamesPlayed: number
-  gamesWon: number
-  winRate: number
-  averageGuesses: number
-  isActive: boolean
-}
-
-export interface Guess {
-  word: string
-  lemma?: string
-  distance: number
-  addedBy: string
-  error?: string
-}
-
-export interface GameRoom {
-  roomId: string
-  gameId: number
-  type: 'default' | 'competitive' | 'battle-royale' | 'stop'
-  finished: boolean
-  guessCount: number
-  createdAt: string
-}
-
-export interface CreateGameOptions {
-  gameId?: number | Date | 'random'
-  allowTips?: boolean
-  allowGiveUp?: boolean
-  maxPlayers?: number
-}
-
-export interface CreateGameResponse {
-  roomId: string
-  gameId: number
-  type: string
-  message: string
-}
-
-export interface GuessResponse {
-  guess: Guess
-  gameFinished: boolean
-  guessCount: number
-}
-
-export interface RoomInfo {
-  roomId: string
-  gameId: number
-  gameDate: string
-  type: string
-  finished: boolean
-  started: boolean
-  guessCount: number
-  allowTips: boolean
-  allowGiveUp: boolean
-  playersProgress?: any[]
-  usedWords?: number
-}
+// Re-export types for convenience
+export type { 
+  GameMode, 
+  Player, 
+  Guess, 
+  GameRoom, 
+  CreateGameOptions, 
+  CreateGameResponse, 
+  GuessResponse, 
+  RoomInfo 
+} from '@contexto/shared'
 
 // API functions
 export const gameApi = {

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { UserManager } from '../UserManager'
 import { Player } from '@contexto/core'
+import { ERROR_MESSAGES, GAME_CONFIG } from '@contexto/shared'
 import * as zod from 'zod'
 
 export function setupUserRoutes(userManager: UserManager) {
@@ -28,7 +29,7 @@ export function setupUserRoutes(userManager: UserManager) {
 		try {
 			const user = req.user
 			if (!user) {
-				return res.status(404).json({ error: 'User not found' })
+				return res.status(404).json({ error: ERROR_MESSAGES.USER_NOT_FOUND })
 			}
 
 			res.json(user.toJSON())
@@ -126,12 +127,12 @@ export function setupUserRoutes(userManager: UserManager) {
 		try {
 			const { username } = req.params
 
-			if (!username || username.length < 3 || username.length > 20) {
-				return res.status(400).json({ error: 'Invalid username length' })
+			if (!username || username.length < GAME_CONFIG.MIN_USERNAME_LENGTH || username.length > GAME_CONFIG.MAX_USERNAME_LENGTH) {
+				return res.status(400).json({ error: ERROR_MESSAGES.USERNAME_TOO_SHORT })
 			}
 
 			if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-				return res.status(400).json({ error: 'Invalid username format' })
+				return res.status(400).json({ error: ERROR_MESSAGES.USERNAME_INVALID_CHARACTERS })
 			}
 
 			const isTaken = await userManager.isUsernameTaken(username)

@@ -4,6 +4,7 @@
   "description": "Contexto Game Monorepo",
   "private": true,
   "workspaces": [
+    "packages/shared",
     "packages/core",
     "packages/server",
     "packages/web",
@@ -21,6 +22,7 @@
     "dev:server": "npm run dev -w @contexto/server",
     "dev:bot": "npm run dev -w @contexto/bot",
     "dev:web": "npm run dev -w @contexto/web",
+    "build:shared": "npm run build -w @contexto/shared",
     "build:server": "npm run build -w @contexto/server",
     "build:bot": "npm run build -w @contexto/bot",
     "build:web": "npm run build -w @contexto/web"

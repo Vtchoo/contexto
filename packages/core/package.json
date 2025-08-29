@@ -8,14 +8,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./utils": {
-      "types": "./dist/utils-only.d.ts",
-      "default": "./dist/utils-only.js"
-    },
-    "./browser": {
-      "types": "./dist/browser-utils.d.ts",
-      "default": "./dist/browser-utils.js"
     }
   },
   "scripts": {
@@ -28,6 +20,7 @@
     "migrate": "npm run typeorm migration:run"
   },
   "dependencies": {
+    "@contexto/shared": "*",
     "typeorm": "^0.3.19",
     "mysql2": "^3.7.0",
     "pg": "^8.16.3",
