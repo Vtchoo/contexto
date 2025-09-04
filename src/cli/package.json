@@ -1,0 +1,26 @@
+{
+  "name": "@contexto/cli",
+  "version": "1.0.0",
+  "description": "CLI client for Contexto multiplayer word game",
+  "main": "dist/index.js",
+  "bin": {
+    "contexto": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "chalk": "^4.1.2",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.3.1",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
