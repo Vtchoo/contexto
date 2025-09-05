@@ -8,7 +8,8 @@
     "packages/core",
     "packages/server",
     "packages/web",
-    "packages/bot"
+    "packages/bot",
+    "packages/cli"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
@@ -19,13 +20,16 @@
     "start:server": "npm start -w @contexto/server",
     "start:bot": "npm start -w @contexto/bot",
     "start:web": "npm start -w @contexto/web",
+    "start:cli": "npm start -w @contexto/cli",
     "dev:server": "npm run dev -w @contexto/server",
     "dev:bot": "npm run dev -w @contexto/bot",
     "dev:web": "npm run dev -w @contexto/web",
+    "dev:cli": "npm run dev -w @contexto/cli",
     "build:shared": "npm run build -w @contexto/shared",
     "build:server": "npm run build -w @contexto/server",
     "build:bot": "npm run build -w @contexto/bot",
-    "build:web": "npm run build -w @contexto/web"
+    "build:web": "npm run build -w @contexto/web",
+    "build:cli": "npm run build -w @contexto/cli"
   },
   "keywords": ["contexto", "game", "multiplayer", "discord", "web"],
   "author": "",
