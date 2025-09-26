@@ -1,6 +1,7 @@
 import { useGame } from '@/contexts/GameContext';
 import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '../../../utils/misc';
 import { PlayerAvatar } from './PlayerAvatar';
+import { useTheme } from '../contexts/ThemeContext';
 
 const getBarWidth = (distance: number) => {
 	const total = 40000;
@@ -18,7 +19,13 @@ const getBarWidth = (distance: number) => {
 	return `${result}%`;
 };
 
-const getBarColor = (distance: number) => {
+const getBarColor = (distance: number, customColor?: string | null) => {
+	// Use custom color if provided
+	if (customColor) {
+		return customColor;
+	}
+	
+	// Fall back to default CSS variables
 	if (distance < GREEN_THRESHOLD) {
 		return 'var(--green)';
 	}
@@ -41,22 +48,34 @@ interface RowProps {
 function Row({ word, distance, highlight, hidden, addedBy, playerId, highlightPlayerGuess }: RowProps) {
 
 	const { getPlayerById } = useGame()
+	const { getThemeStyles, getDistanceColor } = useTheme()
 
 	const displayWord = (hidden && addedBy) ? `@${getPlayerById(addedBy)?.username || addedBy}` : word;
 	// console.log({ word, distance, highlight, hidden, addedBy });
 	return (
-		<div className={`row-wrapper ${highlight ? 'current' : ''}`} key={word}>
-			<div className="outer-bar">
+		<div 
+			className={`row-wrapper ${highlight ? 'current' : ''}`} 
+			key={word}
+			style={getThemeStyles('rowWrapper')}
+		>
+			<div 
+				className="outer-bar"
+				style={getThemeStyles('outerBar')}
+			>
 				<div
 					className="inner-bar"
 					style={{
 						width: getBarWidth(distance),
-						backgroundColor: (addedBy !== playerId && highlightPlayerGuess) ? 'var(--avatar-bg-color)' : getBarColor(distance),
+						backgroundColor: (addedBy !== playerId && highlightPlayerGuess) ? 'var(--avatar-bg-color)' : getBarColor(distance, getDistanceColor(distance)),
+						...getThemeStyles('innerBar')
 					}}
 				/>
 			</div>
-			<div className="row">
-				<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+			<div 
+				className="row"
+				style={getThemeStyles('row')}
+			>
+				<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', ...getThemeStyles('word') }}>
 					{displayWord}
 					{addedBy && !hidden && (addedBy !== playerId) && (
 						<PlayerAvatar 
@@ -67,7 +86,7 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId, highlightPl
 						/>
 					)}
 				</div>
-				<span>{distance + 1}</span>
+				<span style={getThemeStyles('distance')}>{distance + 1}</span>
 			</div>
 		</div>
 	);

@@ -5,6 +5,7 @@ import { PlayerTooltip } from './PlayerTooltip'
 import { strings } from '../constants/strings'
 import { Player } from '@/api/gameApi'
 import { useGame } from '@/contexts/GameContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface Guess {
   word: string
@@ -70,6 +71,7 @@ function GameInterface({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { getPlayerById, currentGame: gameContext } = useGame()
+  const { getThemeStyles } = useTheme()
 
   // Handle player avatar click to show tooltip
   const handlePlayerClick = (playerId: string, position: { x: number; y: number }) => {
@@ -381,10 +383,19 @@ function GameInterface({
   }
 
   return (
-    <div className="wrapper top-ad-padding">
-      <main>
-        <div className="top-bar">
-          <div className="title">
+    <div 
+      className="wrapper top-ad-padding"
+      style={getThemeStyles('wrapper')}
+    >
+      <main style={getThemeStyles('mainContent')}>
+        <div 
+          className="top-bar"
+          style={getThemeStyles('topBar')}
+        >
+          <div 
+            className="title"
+            style={getThemeStyles('title')}
+          >
             <h1>CONTEXTO</h1>
             {gameMode && (
               <div className="game-mode" style={{
@@ -397,7 +408,12 @@ function GameInterface({
               </div>
             )}
           </div>
-          <button className="btn">⋮</button>
+          <button 
+            className="btn"
+            style={getThemeStyles('button')}
+          >
+            ⋮
+          </button>
         </div>
         
         {!gameStarted && (gameMode === 'stop' || gameMode === 'battle-royale') && (
@@ -445,13 +461,24 @@ function GameInterface({
         )}
         
         {isWinner && (
-          <div className="end-msg">
+          <div 
+            className="end-msg"
+            style={getThemeStyles('endMessage')}
+          >
             <p>🎉 {strings.game.congratulations}! {gameMode === 'default' && isMultiplayer ? strings.game.youAllWon : strings.game.youWon}</p>
           </div>
         )}
 
         {otherPlayerWon && (
-          <div className="end-msg" style={{ backgroundColor: '#f8d7da', borderColor: '#f5c6cb', color: '#721c24' }}>
+          <div 
+            className="end-msg" 
+            style={{ 
+              backgroundColor: '#f8d7da', 
+              borderColor: '#f5c6cb', 
+              color: '#721c24',
+              ...getThemeStyles('endMessage')
+            }}
+          >
             <p>
               {gameMode === 'stop' ? '⚡' : '⚔️'} <strong>{otherPlayerWon.username}</strong> venceu em{' '}
               <strong>{otherPlayerWon.guessCount}</strong> tentativa{otherPlayerWon.guessCount !== 1 ? 's' : ''}!
@@ -467,7 +494,10 @@ function GameInterface({
           </div>
         )}
 
-        <div className="info-bar">
+        <div 
+          className="info-bar"
+          style={getThemeStyles('infoBar')}
+        >
           {roomId && (
             <>
               <span className="label">SALA:</span>{' '}
@@ -533,14 +563,23 @@ function GameInterface({
             autoComplete="off"
             autoCapitalize="off"
             enterKeyHint="send"
+            style={getThemeStyles('word')}
           />
         </form>
 
-        {message}
+        <div style={getThemeStyles('message')}>
+          {message}
+        </div>
 
         {/* Show all players who have participated in the game */}
         {playerDisplayData.length > 0 && (
-          <div className="player-list" style={{ paddingBlock: '1rem' }}>
+          <div 
+            className="player-list" 
+            style={{ 
+              paddingBlock: '1rem',
+              ...getThemeStyles('playerList')
+            }}
+          >
             <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
               {playerDisplayData.map((player) => {
                 const playerRanking = gameContext?.ranking?.find(r => r.playerId === player.playerId)
@@ -574,7 +613,10 @@ function GameInterface({
           onClose={closeTooltip}
         />
 
-        <div className="guess-history">
+        <div 
+          className="guess-history"
+          style={getThemeStyles('guessHistory')}
+        >
           {/* Show valid guesses sorted by distance */}
           {sortedGuesses.map((guess, index) => (
             // <Row 

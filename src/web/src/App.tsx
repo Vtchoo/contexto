@@ -1,11 +1,10 @@
 import "./App.css"
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { GameProvider } from './contexts/GameContext'
-import { ThemeProvider } from './contexts/ThemeContext'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import HomePage from './pages/HomePage'
 import GamePage from './pages/GamePage'
 import RoomsPage from './pages/RoomsPage'
-import Header from './components/Header'
 import Footer from './components/Footer'
 import styled from 'styled-components'
 
@@ -21,22 +20,30 @@ const MainContent = styled.main`
   flex-direction: column;
 `
 
+function AppContent() {
+  const { getThemeStyles } = useTheme()
+  
+  return (
+    <AppContainer style={getThemeStyles('appContainer')}>
+      {/* <Header /> */}
+      <MainContent style={getThemeStyles('mainContent')}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/game/:roomId?" element={<GamePage />} />
+          <Route path="/rooms" element={<RoomsPage />} />
+        </Routes>
+      </MainContent>
+      <Footer />
+    </AppContainer>
+  )
+}
+
 function App() {
   return (
     <ThemeProvider>
       <GameProvider>
         <Router>
-          <AppContainer>
-            {/* <Header /> */}
-            <MainContent>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/game/:roomId?" element={<GamePage />} />
-                <Route path="/rooms" element={<RoomsPage />} />
-              </Routes>
-            </MainContent>
-            <Footer />
-          </AppContainer>
+          <AppContent />
         </Router>
       </GameProvider>
     </ThemeProvider>

@@ -19,6 +19,28 @@ export default defineConfig({
       '@api': path.resolve(__dirname, 'src/web/src/api'),
     },
   },
+  server: {
+    port: 3003,
+    host: true, // Enable host binding for better Windows/WSL support
+    watch: {
+      usePolling: true, // Enable polling for file changes (helps on Windows)
+      // interval: 1000, // Check for changes every 1 second
+    },
+    hmr: {
+      overlay: true, // Show error overlay on HMR failures
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/socket.io': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
   build: {
     // Output to dist/public from project root
     outDir: path.resolve(__dirname, 'dist/public'),
