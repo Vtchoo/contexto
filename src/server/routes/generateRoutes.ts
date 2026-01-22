@@ -34,10 +34,18 @@ export function setupGenerateRoutes() {
                 await dataSource.initialize()
             }
 
+            const dimensions = Number(req.query.dimensions) || 100
+            if (dimensions !== 100 && dimensions !== 300) {
+                // TODO: Support 600D later, and also set these values in a central config
+                return res.status(400).json({
+                    error: 'Invalid dimensions parameter. Allowed values are 100 or 300.'
+                })
+            }
+
             // Initialize embeddings service if needed
             if (!embeddingsService.isLoaded) {
                 console.log('🧠 Initializing embeddings service...')
-                await embeddingsService.initialize(300)
+                await embeddingsService.initialize(dimensions)
             }
 
             const wordRepository = dataSource.getRepository(Word)
