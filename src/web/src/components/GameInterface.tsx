@@ -134,7 +134,10 @@ function GameInterface({
               if (a.guessCount !== b.guessCount) {
                 return a.guessCount - b.guessCount
               }
-              return (a.completedAt?.getTime() || 0) - (b.completedAt?.getTime() || 0)
+              if (!a.completedAt || !b.completedAt) return 0
+              const aCompletedAt = new Date(a.completedAt)
+              const bCompletedAt = new Date(b.completedAt)
+              return aCompletedAt.getTime() - bCompletedAt.getTime()
             })
           
           const position = completedPlayers.findIndex(r => r.playerId === playerId) + 1
