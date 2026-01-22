@@ -60,10 +60,22 @@ export function setupGenerateRoutes() {
 
             console.log(`✅ Found ${candidateWords.length} candidate target words`)
 
-            // Step 2: Use seeded PRNG to select target word
+            // Step 2: Shuffle candidate words to ensure better distribution
+            // The database query returns words in a consistent order, so we need to shuffle
+            // them first to prevent the seeded PRNG from always selecting from the same
+            // alphabetical range
             const selector = new GameWordSelector(gameId)
-            const targetWord = selector.selectWord(candidateWords.map(w => w.word))
-            const targetWordEntity = candidateWords.find(w => w.word === targetWord)!
+            const shuffledWords = [...candidateWords]
+            
+            // Use the seeded PRNG to shuffle the array (Fisher-Yates shuffle)
+            for (let i = shuffledWords.length - 1; i > 0; i--) {
+                const j = selector.getRandomInt(0, i + 1)
+                ;[shuffledWords[i], shuffledWords[j]] = [shuffledWords[j], shuffledWords[i]]
+            }
+            
+            // Select the first word from shuffled array (deterministic for same gameId)
+            const targetWord = shuffledWords[0].word
+            const targetWordEntity = shuffledWords[0]
 
             console.log(`🎯 Selected target word: "${targetWord}" (ID: ${targetWordEntity.id}, ICF: ${targetWordEntity.icf})`)
 
@@ -237,8 +249,16 @@ export function setupGenerateRoutes() {
             }
 
             const selector = new GameWordSelector(gameId)
-            const targetWord = selector.selectWord(candidateWords.map(w => w.word))
-            const targetWordEntity = candidateWords.find(w => w.word === targetWord)!
+            
+            // Use same shuffling logic as in the main generation route
+            const shuffledWords = [...candidateWords]
+            for (let i = shuffledWords.length - 1; i > 0; i--) {
+                const j = selector.getRandomInt(0, i + 1)
+                ;[shuffledWords[i], shuffledWords[j]] = [shuffledWords[j], shuffledWords[i]]
+            }
+            
+            const targetWord = shuffledWords[0].word
+            const targetWordEntity = shuffledWords[0]
 
             const rankingsCount = await rankingRepository.count({
                 where: { targetWordId: targetWordEntity.id }
