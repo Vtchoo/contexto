@@ -12,7 +12,8 @@ const FooterContainer = styled.footer`
 function Footer() {
   return (
     <FooterContainer>
-      <p>&copy; 2025 Contexto Web. Built with React & TypeScript.</p>
+      <a href="https://github.com/Vtchoo" target="_blank"><p>Feito com ❤️ por Vtchoo</p></a>
+      <a href="https://contexto.me" target="_blank"><p>Jogo original aqui</p></a>
     </FooterContainer>
   )
 }
