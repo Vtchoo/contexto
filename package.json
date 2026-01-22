@@ -17,6 +17,8 @@
     "typeorm": "npx typeorm-ts-node-commonjs -d ./dataSource.ts",
     "migration:create": "npx typeorm-ts-node-commonjs migration:create",
     "migration:run": "npm run typeorm migration:run",
+    "migration:revert": "npm run typeorm migration:revert",
+    "import:words": "ts-node scripts/importWords.ts",
     "dev": "nodemon src/index.ts",
     "dev:server": "nodemon src/server/index.ts",
     "dev:web": "vite"

@@ -14,6 +14,7 @@ import { UserManager } from './UserManager'
 import { setupGameRoutes } from './routes/gameRoutes'
 import { setupRoomRoutes } from './routes/roomRoutes'
 import { setupUserRoutes } from './routes/userRoutes'
+import { setupGenerateRoutes } from './routes/generateRoutes'
 import { setupSocketHandlers } from './socket/socketHandlers'
 import { Player } from '../models/Player'
 
@@ -144,6 +145,7 @@ api.use(async (req, res, next) => {
 api.use('/game', setupGameRoutes(gameManager, userManager))
 api.use('/rooms', setupRoomRoutes(gameManager, userManager))
 api.use('/users', setupUserRoutes(userManager))
+api.use('/generate', setupGenerateRoutes())
 
 app.use('/api', api)
 

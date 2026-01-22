@@ -9,7 +9,7 @@ export class ContextoEmbeddingsService {
     private embeddings: Map<string, Float32Array> = new Map()
     private vocabulary: string[] = []
     private dimensions: number = 300
-    private isLoaded: boolean = false
+    public isLoaded: boolean = false
 
     constructor(private dataPath: string = 'data') { }
 
