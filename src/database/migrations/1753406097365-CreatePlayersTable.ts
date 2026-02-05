@@ -8,7 +8,7 @@ export class CreatePlayersTable1753406097365 implements MigrationInterface {
                 name: 'players',
                 columns: [
                     { name: 'id', type: 'varchar', length: '255', isPrimary: true, isNullable: false },
-                    { name: 'username', type: 'varchar', length: '50', isNullable: true, isUnique: true },
+                    { name: 'username', type: 'varchar', length: '50', isNullable: true },
                     { name: 'last_activity', type: 'bigint', isNullable: false },
                     { name: 'games_played', type: 'int', default: 0, isNullable: false },
                     { name: 'games_won', type: 'int', default: 0, isNullable: false },
