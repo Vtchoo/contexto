@@ -1,11 +1,22 @@
 import { Router, Request, Response } from 'express'
+import multer from 'multer'
 import { UserManager } from '../UserManager'
 import { Player } from '../../models/Player'
 import * as zod from 'zod'
+import s3Service from '../../services/s3Service'
 
 export function setupUserRoutes(userManager: UserManager) {
 	const router = Router()
 
+	// Configure multer for avatar uploads
+	const upload = multer({
+		storage: multer.memoryStorage(),
+		limits: {
+			fileSize: 5 * 1024 * 1024, // 5MB limit
+			files: 1 // Only allow 1 file
+		}
+	})
+	
 	// Initialize or get user - this ensures user exists and cookies are set
 	router.post('/init', async (req: Request, res: Response) => {
 		try {
@@ -68,6 +79,101 @@ export function setupUserRoutes(userManager: UserManager) {
 			res.status(500).json({ error: error.message });
 		}
 	});
+
+	// Delete avatar
+	router.delete('/me/avatar', async (req: Request, res: Response) => {
+		try {
+			const user = req.user
+			if (!user) {
+				return res.status(404).json({ error: 'User not found' })
+			}
+
+			// Check if S3 is configured
+			if (!s3Service.isConfigured()) {
+				return res.status(503).json({
+					error: 'Avatar service is not configured. Please contact administrator.'
+				})
+			}
+
+			if (!user.avatarUrl) {
+				return res.status(400).json({ error: 'No avatar to delete' })
+			}
+
+			// Delete from S3
+			await s3Service.deleteAvatar(user.avatarUrl)
+
+			// Update user record
+			const success = await userManager.updatePlayer(user.id, { avatarUrl: null })
+			if (!success) {
+				return res.status(500).json({ error: 'Failed to remove avatar' })
+			}
+
+			// Get updated user data
+			const updatedUser = await userManager.getUserById(user.id)
+			res.json({
+				message: 'Avatar deleted successfully',
+				user: updatedUser?.toJSON()
+			})
+
+		} catch (error: any) {
+			console.error('Avatar deletion error:', error)
+			res.status(500).json({ error: error.message })
+		}
+	})
+
+	// Upload avatar
+	router.post('/me/avatar', upload.single('avatar'), async (req: Request, res: Response) => {
+		try {
+			const user = req.user
+			if (!user) {
+				return res.status(404).json({ error: 'User not found' })
+			}
+
+			// Check if S3 is configured
+			if (!s3Service.isConfigured()) {
+				return res.status(503).json({
+					error: 'Avatar upload service is not configured. Please contact administrator.'
+				})
+			}
+
+			const file = req.file
+			if (!file) {
+				return res.status(400).json({ error: 'No file uploaded' })
+			}
+
+			// Validate the file
+			const validation = s3Service.validateImageFile(file)
+			if (!validation.isValid) {
+				return res.status(400).json({ error: validation.error })
+			}
+
+			// Delete old avatar if it exists
+			if (user.avatarUrl) {
+				await s3Service.deleteAvatar(user.avatarUrl)
+			}
+
+			// Upload new avatar
+			const avatarUrl = await s3Service.uploadAvatar(file, user.id)
+
+			// Update user record
+			const success = await userManager.updatePlayer(user.id, { avatarUrl })
+			if (!success) {
+				return res.status(500).json({ error: 'Failed to update user avatar' })
+			}
+
+			// Get updated user data
+			const updatedUser = await userManager.getUserById(user.id)
+			res.json({
+				message: 'Avatar uploaded successfully',
+				avatarUrl,
+				user: updatedUser,
+			})
+
+		} catch (error: any) {
+			console.error('Avatar upload error:', error)
+			res.status(500).json({ error: error.message })
+		}
+	})
 
 	// Get user by ID
 	router.get('/:userId', async (req, res) => {

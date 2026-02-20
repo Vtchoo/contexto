@@ -6,6 +6,7 @@ import { useGame } from '../contexts/GameContext'
 import CustomGameModal from '../components/CustomGameModal'
 import { Settings } from '../components/Settings'
 import { GameMode, Player } from '@/api/gameApi'
+import { AvatarUpload } from '@/components/AvatarUpload'
 
 const Container = styled.div`
   display: flex;
@@ -512,6 +513,7 @@ function HomePage() {
               )}
             </div>
         </form>
+        <AvatarUpload />
       </EditUserSection>
 
       <Settings />

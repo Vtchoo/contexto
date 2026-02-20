@@ -1,6 +1,6 @@
 import { useGame } from '@/contexts/GameContext';
 import { GREEN_THRESHOLD, YELLOW_THRESHOLD } from '../../../utils/misc';
-import { PlayerAvatar } from './PlayerAvatar';
+import PlayerAvatar from './PlayerAvatar';
 
 const getBarWidth = (distance: number) => {
 	const total = 40000;
@@ -42,7 +42,9 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId, highlightPl
 
 	const { getPlayerById } = useGame()
 
-	const displayWord = (hidden && addedBy) ? `@${getPlayerById(addedBy)?.username || addedBy}` : word;
+	const player = addedBy ? getPlayerById(addedBy) : null
+
+	const displayWord = (hidden && addedBy) ? `@${player?.username || addedBy}` : word;
 	// console.log({ word, distance, highlight, hidden, addedBy });
 	return (
 		<div className={`row-wrapper ${highlight ? 'current' : ''}`} key={word}>
@@ -61,7 +63,8 @@ function Row({ word, distance, highlight, hidden, addedBy, playerId, highlightPl
 					{addedBy && !hidden && (addedBy !== playerId) && (
 						<PlayerAvatar 
 							id={addedBy} 
-							username={getPlayerById(addedBy)?.username} 
+							avatarUrl={player?.avatarUrl}
+							username={player?.username} 
 							size={24} 
 							transparent 
 						/>

@@ -5,7 +5,7 @@ import { KEEP_ALIVE_CONFIG } from '@/utils/keepAlive'
 import contextualize from '@/utils/contextualize'
 import { useCache } from '@/hooks/useCache'
 
-const socketUrl = import.meta.env.VITE_API_URL || 
+const socketUrl = import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001')
 
 interface CurrentGame {
@@ -64,13 +64,13 @@ function useGameHook() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Theme and settings state
   const [settings, setSettings] = useState<GameSettings>(() => getStoredSettings())
 
   // const [playersCache, setPlayersCache] = useState<Map<string, Player>>(new Map())
   const { get: getPlayerFromCache, add: addToPlayerCache } = useCache(async (playerId: string) => userApi.getPlayerById(playerId))
-  
+
   // Use ref to track if initialization is in progress to prevent race conditions
   const initializationInProgress = useRef(false)
 
@@ -91,7 +91,7 @@ function useGameHook() {
       setUser(userData)
       setIsInitialized(true)
       console.log('User initialized:', userData)
-      
+
       // Only connect socket after user is initialized
       // connect()
     } catch (err) {
@@ -106,13 +106,13 @@ function useGameHook() {
   // Apply theme to document
   const applyTheme = (theme: Theme) => {
     let effectiveTheme: 'light' | 'dark'
-    
+
     if (theme === 'auto') {
       effectiveTheme = getSystemPrefersDark() ? 'dark' : 'light'
     } else {
       effectiveTheme = theme
     }
-    
+
     document.documentElement.setAttribute('data-theme', effectiveTheme)
   }
 
@@ -134,7 +134,7 @@ function useGameHook() {
         applyTheme('auto')
       }
     }
-    
+
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [settings.theme])
@@ -142,7 +142,7 @@ function useGameHook() {
   useEffect(() => {
     if (!user)
       return
-    
+
     connect()
 
     return () => {
@@ -219,11 +219,11 @@ function useGameHook() {
       // Handle our own guess result
       setCurrentGame(prev => {
         if (!prev) return null
-        
+
         // Update ranking data for current user
         let updatedRanking = [...(prev.ranking || [])]
         const playerRankingIndex = updatedRanking.findIndex(r => r.playerId === user?.id)
-        
+
         if (!data.guess.error && user?.id) {
           if (playerRankingIndex >= 0) {
             // Update existing player ranking
@@ -231,12 +231,12 @@ function useGameHook() {
             updatedRanking[playerRankingIndex] = {
               ...currentRanking,
               guessCount: currentRanking.guessCount + 1,
-              closestDistance: currentRanking.closestDistance !== undefined 
+              closestDistance: currentRanking.closestDistance !== undefined
                 ? Math.min(currentRanking.closestDistance, data.guess.distance)
                 : data.guess.distance,
               // Set completion time if this guess wins (distance 0) and not already completed
-              completedAt: data.guess.distance === 0 && currentRanking.closestDistance !== 0 
-                ? new Date() 
+              completedAt: data.guess.distance === 0 && currentRanking.closestDistance !== 0
+                ? new Date()
                 : currentRanking.completedAt
             }
           } else {
@@ -249,7 +249,7 @@ function useGameHook() {
             })
           }
         }
-        
+
         return {
           ...prev,
           guesses: [...prev.guesses, data.guess],
@@ -264,7 +264,7 @@ function useGameHook() {
       // Handle other players' guesses in multiplayer
       setCurrentGame(prev => {
         if (!prev) return null
-        
+
         const newGuess = {
           word: data.word,
           distance: data.distance,
@@ -272,9 +272,9 @@ function useGameHook() {
           error: data.error,
           hidden: data.hidden
         }
-        
+
         let updatedGuesses = [...prev.guesses]
-        
+
         // If it's the current user's guess, always add it
         if (data.addedBy === user?.id) {
           updatedGuesses.push(newGuess)
@@ -283,7 +283,7 @@ function useGameHook() {
           if (prev.gameMode === 'competitive' || prev.gameMode === 'stop') {
             // Find existing guess from this player
             const existingGuessIndex = updatedGuesses.findIndex(guess => guess.addedBy === data.addedBy)
-            
+
             if (existingGuessIndex >= 0) {
               const existingGuess = updatedGuesses[existingGuessIndex]
               // Only replace if the new guess is closer (lower distance)
@@ -300,11 +300,11 @@ function useGameHook() {
             updatedGuesses.push(newGuess)
           }
         }
-        
+
         // Update ranking data
         let updatedRanking = [...(prev.ranking || [])]
         const playerRankingIndex = updatedRanking.findIndex(r => r.playerId === data.addedBy)
-        
+
         if (!data.error) {
           if (playerRankingIndex >= 0) {
             // Update existing player ranking
@@ -312,12 +312,12 @@ function useGameHook() {
             updatedRanking[playerRankingIndex] = {
               ...currentRanking,
               guessCount: currentRanking.guessCount + 1,
-              closestDistance: currentRanking.closestDistance !== undefined 
+              closestDistance: currentRanking.closestDistance !== undefined
                 ? Math.min(currentRanking.closestDistance, data.distance)
                 : data.distance,
               // Set completion time if this guess wins (distance 0) and not already completed
-              completedAt: data.distance === 0 && currentRanking.closestDistance !== 0 
-                ? new Date() 
+              completedAt: data.distance === 0 && currentRanking.closestDistance !== 0
+                ? new Date()
                 : currentRanking.completedAt
             }
           } else {
@@ -330,7 +330,7 @@ function useGameHook() {
             })
           }
         }
-        
+
         return {
           ...prev,
           guesses: updatedGuesses,
@@ -551,7 +551,7 @@ function useGameHook() {
     console.log('socket connected:', socket?.connected) // Debug log
     console.log('isConnected:', isConnected) // Debug log
     console.log('isInitialized:', isInitialized) // Debug log
-    
+
     if (!currentGame?.roomId || !socket || !isConnected || !isInitialized) {
       console.log('startGame failed - missing requirements') // Debug log
       setError('Não é possível iniciar o jogo')
@@ -560,6 +560,16 @@ function useGameHook() {
 
     console.log('Emitting start_game event') // Debug log
     socket.emit('start_game')
+  }
+
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const userData = await userApi.getCurrentUser()
+      setUser(userData)
+    } catch (err) {
+      console.error('Failed to refresh user:', err)
+      setError('Failed to refresh user data')
+    }
   }
 
   const updatePlayer = async (playerInfo: Partial<Player>) => {
@@ -616,7 +626,7 @@ function useGameHook() {
 
       // Initial ping after configured delay
       const initialTimeout = setTimeout(keepAlive, KEEP_ALIVE_CONFIG.initialDelay)
-      
+
       // Then ping at configured interval
       const interval = setInterval(keepAlive, KEEP_ALIVE_CONFIG.interval)
 
@@ -653,6 +663,7 @@ function useGameHook() {
     startGame,
     clearError,
     getPlayerById,
+    refreshUser,
     updatePlayer,
     setTheme,
   }

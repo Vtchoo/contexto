@@ -20,6 +20,9 @@ export class Player {
     @Column('decimal', { precision: 10, scale: 2, name: 'average_guesses', default: 0 })
     averageGuesses: number
 
+    @Column('varchar', { length: 500, nullable: true, name: 'avatar_url' })
+    avatarUrl: string | null
+    
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date
 
@@ -97,7 +100,8 @@ export class Player {
             gamesWon: this.gamesWon,
             winRate: this.getWinRate(),
             averageGuesses: Math.round(this.averageGuesses * 100) / 100,
-            isActive: this.isActive()
+            isActive: this.isActive(),
+            avatarUrl: this.avatarUrl,
         }
     }
 }

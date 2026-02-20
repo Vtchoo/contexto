@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Row from './original_Row'
-import { PlayerAvatar } from './PlayerAvatar'
+import PlayerAvatar from './PlayerAvatar'
 import { PlayerTooltip } from './PlayerTooltip'
 import { strings } from '../constants/strings'
 import { Player } from '@/api/gameApi'
@@ -17,6 +17,7 @@ interface Guess {
 interface PlayerDisplayData {
   playerId: string
   username?: string
+  avatarUrl?: string
   isOnline: boolean
   transparent: boolean
   numberBadge?: number
@@ -59,6 +60,7 @@ function GameInterface({
     isVisible: boolean
     playerId?: string
     username?: string
+    avatarUrl?: string
     closestDistance?: number
     totalGuesses: number
     position: { x: number; y: number }
@@ -74,12 +76,13 @@ function GameInterface({
   // Handle player avatar click to show tooltip
   const handlePlayerClick = (playerId: string, position: { x: number; y: number }) => {
     const playerRanking = gameContext?.ranking?.find(r => r.playerId === playerId)
-    const username = getPlayerById(playerId)?.username
+    const player = getPlayerById(playerId)
     
     setTooltipData({
       isVisible: true,
       playerId,
-      username,
+      username: player?.username,
+      avatarUrl: player?.avatarUrl,
       closestDistance: playerRanking?.closestDistance,
       totalGuesses: playerRanking?.guessCount || 0,
       position
@@ -111,6 +114,7 @@ function GameInterface({
       const playerRanking = ranking.find(r => r.playerId === playerId)
       const isPlayerOnline = players.includes(playerId)
       const hasPlayerMadeGuesses = playersWithGuesses.includes(playerId)
+      const player = getPlayerById(playerId)
       
       // Calculate badges based on game mode and rules
       let medalPosition: 1 | 2 | 3 | undefined
@@ -168,7 +172,8 @@ function GameInterface({
       
       return {
         playerId,
-        username: getPlayerById(playerId)?.username,
+        username: player?.username,
+        avatarUrl: player?.avatarUrl,
         isOnline: isPlayerOnline,
         transparent: !isPlayerOnline && hasPlayerMadeGuesses,
         numberBadge,
@@ -552,6 +557,7 @@ function GameInterface({
                     key={player.playerId} 
                     id={player.playerId} 
                     username={player.username} 
+                    avatarUrl={player.avatarUrl}
                     size={36}
                     transparent={player.transparent}
                     numberBadge={player.numberBadge}

@@ -16,6 +16,7 @@ export type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
 export interface Player {
   id: string
   username?: string
+  avatarUrl?: string
   gamesPlayed: number
   gamesWon: number
   winRate: number
@@ -167,6 +168,23 @@ export const userApi = {
 
   checkUsernameAvailability: async (username: string) => {
     const response = await api.get(`/api/users/username/check/${username}`)
+    return response.data
+  },
+  
+  // Avatar management
+  uploadAvatar: async (file: File) => {
+    const formData = new FormData()
+    formData.append('avatar', file)
+    const response = await api.post('/api/users/me/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
+
+  deleteAvatar: async () => {
+    const response = await api.delete('/api/users/me/avatar')
     return response.data
   },
 
