@@ -409,10 +409,8 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
       if (socketUser) {
         try {
-          const payload = JWTService.verifyToken(socketUser.token)
-          const user = payload ? await userManager.getUserById(payload.userId) : null
-          const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
-          if (user && currentRoom) {
+          const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
+          if (currentRoom) {
             // Notify room about player leaving
             socket.to(currentRoom).emit('player_left', {
               userId: socketUser.userId,
