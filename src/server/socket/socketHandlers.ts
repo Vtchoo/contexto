@@ -29,6 +29,8 @@ const getGameMode = (game: IGame): string => {
 }
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
+  // Track current socket ID for each user to prevent race conditions
+  const userSocketMap = new Map<string, string>()
 
   io.on('connection', async (socket: Socket) => {
     console.log(`🔌 User connected: ${socket.id}`)
@@ -81,6 +83,9 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
     console.log(`✅ User authenticated via socket: ${user.id}`)
 
+    // Update user's current socket ID
+    userSocketMap.set(user.id, socket.id)
+
     // Join room handler
     socket.on('join_room', async (data: { roomId: string }) => {
       try {
@@ -112,6 +117,9 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
         // Join new room
         socket.join(roomId)
+
+        // Update user's current socket ID (in case of reconnection)
+        userSocketMap.set(socketUser.userId, socket.id)
 
         // Add user to game
         gameManager.joinGame(socketUser.userId, roomId)
@@ -409,16 +417,26 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
       if (socketUser) {
         try {
-          const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
-          if (currentRoom) {
-            // Notify room about player leaving
-            socket.to(currentRoom).emit('player_left', {
-              userId: socketUser.userId,
-              username: socketUser.username
-            })
+          // Only process disconnect if this is the current socket for the user
+          const currentSocketId = userSocketMap.get(socketUser.userId)
+          if (currentSocketId === socket.id) {
+            const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
+            if (currentRoom) {
+              // Notify room about player leaving
+              socket.to(currentRoom).emit('player_left', {
+                userId: socketUser.userId,
+                username: socketUser.username
+              })
 
-            // Remove user from game
-            gameManager.removeUserFromGame(socketUser.userId, currentRoom)
+              // Remove user from game
+              gameManager.removeUserFromGame(socketUser.userId, currentRoom)
+            }
+            
+            // Clean up the socket mapping for this user
+            userSocketMap.delete(socketUser.userId)
+            console.log(`🚪 User ${socketUser.userId} legitimately disconnected`)
+          } else {
+            console.log(`🔄 Ignoring disconnect from old socket for user ${socketUser.userId} (current: ${currentSocketId}, disconnecting: ${socket.id})`)
           }
         } catch (error) {
           console.error(`❌ Error handling disconnect for user ${socketUser.userId}:`, error)
