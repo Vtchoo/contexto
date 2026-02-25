@@ -16,16 +16,16 @@ interface SocketUser {
 
 // 'default' | 'competitive' | 'battle-royale' | 'stop'
 const getGameMode = (game: IGame): string => {
-	if (game instanceof ContextoDefaultGame) {
-		return 'default'
-	} else if (game instanceof ContextoCompetitiveGame) {
-		return 'competitive'
-	} else if (game instanceof ContextoBattleRoyaleGame) {
-		return 'battle-royale'
-	} else if (game instanceof ContextoStopGame) {
-		return 'stop'
-	}
-	return 'default'
+  if (game instanceof ContextoDefaultGame) {
+    return 'default'
+  } else if (game instanceof ContextoCompetitiveGame) {
+    return 'competitive'
+  } else if (game instanceof ContextoBattleRoyaleGame) {
+    return 'battle-royale'
+  } else if (game instanceof ContextoStopGame) {
+    return 'stop'
+  }
+  return 'default'
 }
 
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
@@ -108,15 +108,17 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         // Leave current room if any
-        const payload = JWTService.verifyToken(socketUser.token)
-        const user = payload ? await userManager.getUserById(payload.userId) : null
-        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
-        if (currentRoom) {
+        const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
+        if (currentRoom && currentRoom !== roomId) {
           socket.leave(currentRoom)
+          socket.to(currentRoom).emit('player_left', {
+            userId: socketUser.userId,
+            username: socketUser.username
+          })
+        } else {
+          // Join new room
+          socket.join(roomId)
         }
-
-        // Join new room
-        socket.join(roomId)
 
         // Update user's current socket ID (in case of reconnection)
         userSocketMap.set(socketUser.userId, socket.id)
@@ -125,16 +127,14 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         gameManager.joinGame(socketUser.userId, roomId)
 
         // Update user's current room
-        if (user) {
-          userManager.joinUserToRoom(user.id, roomId)
-        }
+        userManager.joinUserToRoom(user.id, roomId)
 
         // Notify room about new player
         socket.to(roomId).emit('player_joined', {
           userId: socketUser.userId,
           username: socketUser.username
         })
-        
+
         const gameState = game.getCurrentGameState(socketUser.userId)
 
         socket.emit('room_joined', {
@@ -389,9 +389,9 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           socket.emit('error', { error: 'Invalid data format' })
           return
         }
-        
+
         await userManager.updatePlayer(player.id, fields)
-        
+
         console.log(`✅ User ${player.id} updated info:`, fields)
         socket.emit('player_update_success', { player })
         // Notify all players in the room about the update
@@ -431,10 +431,9 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
               // Remove user from game
               gameManager.removeUserFromGame(socketUser.userId, currentRoom)
             }
-            
+
             // Clean up the socket mapping for this user
             userSocketMap.delete(socketUser.userId)
-            console.log(`🚪 User ${socketUser.userId} legitimately disconnected`)
           } else {
             console.log(`🔄 Ignoring disconnect from old socket for user ${socketUser.userId} (current: ${currentSocketId}, disconnecting: ${socket.id})`)
           }
@@ -457,7 +456,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
     if (removedGames > 0) {
       console.log(`🧹 Cleanup: Removed ${removedGames} old games`)
     }
-    
+
     // const removedUsers = await userManager.cleanupInactiveUsers()
     // if (removedGames > 0 || removedUsers > 0) {
     //   console.log(`🧹 Cleanup: Removed ${removedGames} old games and ${removedUsers} inactive users`)

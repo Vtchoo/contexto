@@ -58,7 +58,8 @@ abstract class ContextoBaseGame implements IGame {
 
     addPlayer(playerId: string): void {
         if (this.players.includes(playerId)) {
-            throw new Error(`Player ${playerId} is already in the game`)
+            console.log(`Player ${playerId} is already in the game`)
+            return
         }
         this.players.push(playerId)
     }
