@@ -127,7 +127,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         gameManager.joinGame(socketUser.userId, roomId)
 
         // Update user's current room
-        userManager.joinUserToRoom(user.id, roomId)
+        userManager.joinUserToRoom(socketUser.userId, roomId)
 
         // Notify room about new player
         socket.to(roomId).emit('player_joined', {
