@@ -5,6 +5,7 @@ import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
 import { ContextoStopGame } from './ContextoStopGame'
 import { ContextoBattleRoyaleGame } from './ContextoBattleRoyaleGame'
+import { ContextoTeamGame } from './ContextoTeamGame'
 import GameApi from './gameApi'
 import { getPrefetchedGamesRepository } from '../repositories/PrefetchedGamesRepository'
 
@@ -20,7 +21,7 @@ class ContextoManager {
         let justStarted = false
         if (!game) {
             // Only allow default and competitive games through this method
-            // Stop games must be created explicitly through createNewGame
+            // Stop/team/battle-royale games must be created explicitly through createNewGame
             // Always create a new private room for any game type
             game = this.createNewGame(playerId, gameType, gameIdOrDate)
             justStarted = true
@@ -36,7 +37,7 @@ class ContextoManager {
         return undefined
     }
 
-    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default', gameIdOrDate?: number | Date) {
+    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' | 'team' = 'default', gameIdOrDate?: number | Date) {
         let game: IGame
         switch (gameType) {
             case 'competitive':
@@ -47,6 +48,9 @@ class ContextoManager {
                 break
             case 'battle-royale':
                 game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
+                break
+            case 'team':
+                game = new ContextoTeamGame(playerId, this, gameIdOrDate)
                 break
             case 'default':
             default:

@@ -4,7 +4,7 @@ import { UserManager } from '../UserManager'
 import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
-import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from '../../game'
+import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoTeamGame } from '../../game'
 import { IGame } from '../../game/interface'
 import * as zod from 'zod'
 
@@ -14,7 +14,7 @@ interface SocketUser {
   username?: string
 }
 
-// 'default' | 'competitive' | 'battle-royale' | 'stop'
+// 'default' | 'competitive' | 'battle-royale' | 'stop' | 'team'
 const getGameMode = (game: IGame): string => {
   if (game instanceof ContextoDefaultGame) {
     return 'default'
@@ -24,6 +24,8 @@ const getGameMode = (game: IGame): string => {
     return 'battle-royale'
   } else if (game instanceof ContextoStopGame) {
     return 'stop'
+  } else if (game instanceof ContextoTeamGame) {
+    return 'team'
   }
   return 'default'
 }
@@ -136,6 +138,12 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         })
 
         const gameState = game.getCurrentGameState(socketUser.userId)
+        const teamInfo = game instanceof ContextoTeamGame ? {
+          playerTeam: game.getPlayerTeam(socketUser.userId),
+          allTeams: game.getTeams(),
+          teamRankings: game.getTeamRankings(),
+          otherTeamsBest: game.getOtherTeamsBestGuesses(socketUser.userId)
+        } : null
 
         socket.emit('room_joined', {
           roomId,
@@ -148,6 +156,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           gameMode: getGameMode(game),
           players: gameState.players,
           ranking: gameState.ranking,
+          teamInfo
         })
 
         console.log(`🏠 User ${socketUser.userId} joined room ${roomId}`)
@@ -252,7 +261,32 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           gameFinished: game.finished,
           addedBy: socketUser.userId,
           hidden: game instanceof ContextoDefaultGame ? false : true, // Hide guesses in multiplayer games
+          teamGuess: game instanceof ContextoTeamGame, // Indicate if this is a team guess
         })
+
+        // If it's a team game, emit team-specific events
+        if (game instanceof ContextoTeamGame) {
+          const playerTeam = game.getPlayerTeam(socketUser.userId)
+          if (playerTeam) {
+            // Emit to team members the full guess details
+            playerTeam.players.forEach(playerId => {
+              const playerSocketId = userSocketMap.get(playerId)
+              if (playerSocketId && playerSocketId !== socket.id) {
+                io.to(playerSocketId).emit('team_guess', {
+                  guess,
+                  gameFinished: game.finished,
+                  addedBy: socketUser?.userId,
+                  teamName: playerTeam.name
+                })
+              }
+            })
+
+            // Emit updated team rankings to all players
+            io.to(roomId).emit('team_rankings_updated', {
+              rankings: game.getTeamRankings()
+            })
+          }
+        }
 
         // If game finished, update user stats
         if (game.finished && guess.distance === 0) {
@@ -264,15 +298,49 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
             user.updateAverageGuesses(game.guessCount)
           }
 
+          // For team games, also update stats for all team members
+          if (game instanceof ContextoTeamGame) {
+            const winningTeam = game.getPlayerTeam(socketUser.userId)
+            if (winningTeam) {
+              // Update stats for all team members
+              for (const teamMemberId of winningTeam.players) {
+                if (teamMemberId !== socketUser.userId) {
+                  const teamMember = await userManager.getUserById(teamMemberId)
+                  if (teamMember) {
+                    teamMember.incrementGamesPlayed()
+                    teamMember.incrementGamesWon()
+                    teamMember.updateAverageGuesses(game.getGuessCount(teamMemberId))
+                  }
+                }
+              }
+            }
+          }
+
           // Notify room about game completion
-          io.to(roomId).emit('game_finished', {
-            winner: {
-              userId: socketUser.userId,
-              username: socketUser.username,
-              guessCount: game.guessCount
-            },
-            answer: guess.word
-          })
+          if (game instanceof ContextoTeamGame) {
+            const winningTeam = game.getTeamRankings()[0]
+            const playerTeam = game.getPlayerTeam(socketUser.userId)
+            
+            io.to(roomId).emit('game_finished', {
+              winner: {
+                teamId: winningTeam?.teamId,
+                teamName: winningTeam?.teamName,
+                guessCount: winningTeam?.guessCount,
+                players: playerTeam?.players || []
+              },
+              answer: guess.word,
+              gameMode: 'team'
+            })
+          } else {
+            io.to(roomId).emit('game_finished', {
+              winner: {
+                userId: socketUser.userId,
+                username: socketUser.username,
+                guessCount: game.guessCount
+              },
+              answer: guess.word
+            })
+          }
         }
 
         console.log(`🎯 User ${socketUser.userId} guessed "${word}" in room ${roomId}`)
@@ -311,14 +379,41 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           return
         }
 
+        // Additional validation for team games
+        if (game instanceof ContextoTeamGame) {
+          const teams = game.getTeams()
+          if (teams.length < 2) {
+            socket.emit('error', { error: 'At least 2 teams are required to start the game' })
+            return
+          }
+          
+          // Check if all players are on teams
+          const playersWithoutTeams = game.players.filter(playerId => !game.getPlayerTeam(playerId))
+          if (playersWithoutTeams.length > 0) {
+            socket.emit('error', { error: 'All players must be on a team before starting' })
+            return
+          }
+        }
+
         // Start the game
         game.startGame()
+
+        // Prepare team-specific data for team games
+        let teamData: { teams: any[]; teamCount: number } | null = null
+        if (game instanceof ContextoTeamGame) {
+          teamData = {
+            teams: game.getTeams(),
+            teamCount: game.getTeams().length
+          }
+        }
 
         // Notify all players in the room that the game has started
         io.to(roomId).emit('game_started', {
           roomId,
           gameId: game.gameId,
-          started: true
+          started: true,
+          gameMode: getGameMode(game),
+          teamData
         })
 
         console.log(`🚀 Game started in room ${roomId} by host ${socketUser.userId}`)
@@ -357,6 +452,259 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         socket.emit('closest_guesses', {
           closestGuesses,
           count: closestGuesses.length
+        })
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // Create team handler
+    socket.on('create_team', async (data: { teamName: string; color?: string }) => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? await userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const { teamName, color } = data
+        const roomId = currentRoom
+
+        if (!teamName || typeof teamName !== 'string') {
+          socket.emit('error', { error: 'Team name is required' })
+          return
+        }
+
+        const game = gameManager.getGame(roomId)
+        if (!game || !(game instanceof ContextoTeamGame)) {
+          socket.emit('error', { error: 'Not in a team game' })
+          return
+        }
+
+        if (game.started) {
+          socket.emit('error', { error: 'Cannot create teams after game has started' })
+          return
+        }
+
+        const teamId = game.createTeam(socketUser.userId, teamName.trim(), color)
+        const team = game.getPlayerTeam(socketUser.userId)
+
+        // Notify all players in the room about the new team
+        io.to(roomId).emit('team_created', {
+          team,
+          createdBy: socketUser.userId,
+          createdByUsername: socketUser.username
+        })
+
+        socket.emit('team_action_success', {
+          action: 'create',
+          team,
+          message: `Team "${teamName.trim()}" created successfully`
+        })
+
+        console.log(`🏆 User ${socketUser.userId} created team "${teamName.trim()}" in room ${roomId}`)
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // Join team handler
+    socket.on('join_team', async (data: { teamIdentifier: string }) => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? await userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const { teamIdentifier } = data
+        const roomId = currentRoom
+
+        if (!teamIdentifier || typeof teamIdentifier !== 'string') {
+          socket.emit('error', { error: 'Team identifier is required' })
+          return
+        }
+
+        const game = gameManager.getGame(roomId)
+        if (!game || !(game instanceof ContextoTeamGame)) {
+          socket.emit('error', { error: 'Not in a team game' })
+          return
+        }
+
+        if (game.started) {
+          socket.emit('error', { error: 'Cannot join teams after game has started' })
+          return
+        }
+
+        game.joinTeam(socketUser.userId, teamIdentifier.trim())
+        const team = game.getPlayerTeam(socketUser.userId)
+
+        // Notify all players in the room about the team join
+        io.to(roomId).emit('team_updated', {
+          team,
+          joinedBy: socketUser.userId,
+          joinedByUsername: socketUser.username
+        })
+
+        socket.emit('team_action_success', {
+          action: 'join',
+          team,
+          message: `Joined team "${team?.name}" successfully`
+        })
+
+        console.log(`🏆 User ${socketUser.userId} joined team "${team?.name}" in room ${roomId}`)
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // Leave team handler
+    socket.on('leave_team', async () => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? await userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const roomId = currentRoom
+
+        const game = gameManager.getGame(roomId)
+        if (!game || !(game instanceof ContextoTeamGame)) {
+          socket.emit('error', { error: 'Not in a team game' })
+          return
+        }
+
+        if (game.started) {
+          socket.emit('error', { error: 'Cannot leave team after game has started' })
+          return
+        }
+
+        const team = game.getPlayerTeam(socketUser.userId)
+        if (!team) {
+          socket.emit('error', { error: 'Not on a team' })
+          return
+        }
+
+        const teamName = team.name
+        const teamId = team.id
+        game.removePlayer(socketUser.userId)
+        
+        // Check if team still exists after removing player (it gets deleted if empty)
+        const teamStillExists = game.getTeams().some(t => t.id === teamId)
+
+        // Notify all players in the room about the team leave
+        io.to(roomId).emit('team_updated', {
+          leftBy: socketUser.userId,
+          leftByUsername: socketUser.username,
+          teamName: teamName,
+          teamId: teamId,
+          teamDeleted: !teamStillExists
+        })
+
+        socket.emit('team_action_success', {
+          action: 'leave',
+          message: `Left team "${teamName}" successfully`
+        })
+
+        console.log(`🏆 User ${socketUser.userId} left team "${teamName}" in room ${roomId}`)
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // List teams handler
+    socket.on('list_teams', async () => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? await userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const roomId = currentRoom
+
+        const game = gameManager.getGame(roomId)
+        if (!game || !(game instanceof ContextoTeamGame)) {
+          socket.emit('error', { error: 'Not in a team game' })
+          return
+        }
+
+        const teams = game.getTeams()
+        const playerTeam = game.getPlayerTeam(socketUser.userId)
+
+        socket.emit('teams_list', {
+          teams,
+          playerTeam,
+          canJoinTeams: !game.started
+        })
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    // Get team info handler
+    socket.on('get_team_info', async () => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const payload = JWTService.verifyToken(socketUser.token)
+        const user = payload ? await userManager.getUserById(payload.userId) : null
+        const currentRoom = user ? userManager.getUserCurrentRoom(user.id) : null
+        if (!user || !currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const roomId = currentRoom
+
+        const game = gameManager.getGame(roomId)
+        if (!game || !(game instanceof ContextoTeamGame)) {
+          socket.emit('error', { error: 'Not in a team game' })
+          return
+        }
+
+        const playerTeam = game.getPlayerTeam(socketUser.userId)
+        const otherTeamsBest = game.getOtherTeamsBestGuesses(socketUser.userId)
+        const teamRankings = game.getTeamRankings()
+
+        socket.emit('team_info', {
+          playerTeam,
+          otherTeamsBest,
+          teamRankings,
+          gameStarted: game.started,
+          gameFinished: game.finished
         })
       } catch (error: any) {
         socket.emit('error', { error: error.message })
@@ -422,6 +770,18 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           if (currentSocketId === socket.id) {
             const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
             if (currentRoom) {
+              // Get team info before removing player for team games
+              const game = gameManager.getGame(currentRoom)
+              let teamUpdateData: { leftBy: string; leftByUsername: string; teamName?: string } | null = null
+              if (game instanceof ContextoTeamGame) {
+                const playerTeam = game.getPlayerTeam(socketUser.userId)
+                teamUpdateData = {
+                  leftBy: socketUser.userId,
+                  leftByUsername: socketUser.username || '',
+                  teamName: playerTeam?.name
+                }
+              }
+
               // Notify room about player leaving
               socket.to(currentRoom).emit('player_left', {
                 userId: socketUser.userId,
@@ -430,6 +790,11 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
 
               // Remove user from game
               gameManager.removeUserFromGame(socketUser.userId, currentRoom)
+
+              // Emit team update for team games
+              if (teamUpdateData && game instanceof ContextoTeamGame) {
+                socket.to(currentRoom).emit('team_updated', teamUpdateData)
+              }
             }
 
             // Clean up the socket mapping for this user

@@ -8,10 +8,40 @@ import { useCache } from '@/hooks/useCache'
 const socketUrl = import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001')
 
+interface Team {
+  id: string
+  name: string
+  players: string[]
+  guesses: Guess[]
+  completed: boolean
+  completionTime?: Date
+  color?: string
+}
+
+interface TeamRanking {
+  teamId: string
+  teamName: string
+  guessCount: number
+  closestDistance: number
+  completed: boolean
+  completionTime?: Date
+}
+
+interface TeamInfo {
+  playerTeam: Team | null
+  allTeams: Team[]
+  teamRankings: TeamRanking[]
+  otherTeamsBest: Array<{
+    teamName: string
+    bestDistance: number
+    guessCount: number
+  }>
+}
+
 interface CurrentGame {
   roomId: string
   gameId: string
-  gameMode: 'default' | 'competitive' | 'battle-royale' | 'stop'
+  gameMode: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'team'
   guesses: Guess[]
   finished: boolean
   started: boolean
@@ -24,6 +54,7 @@ interface CurrentGame {
     completedAt?: Date
   }>
   answerWord?: string // The answer word when game finishes
+  teamInfo?: TeamInfo | null // Team-specific data
 }
 
 type Theme = 'light' | 'dark' | 'auto'
@@ -56,6 +87,20 @@ const getSystemPrefersDark = (): boolean => {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+// Predefined team colors
+const TEAM_COLORS = [
+  '#FF6B6B', // Red
+  '#4ECDC4', // Teal
+  '#45B7D1', // Blue
+  '#FFA07A', // Light Salmon
+  '#98D8C8', // Mint
+  '#F7DC6F', // Light Yellow
+  '#BB8FCE', // Light Purple
+  '#85C1E9', // Light Blue
+  '#F8C471', // Light Orange
+  '#82E0AA', // Light Green
+]
+
 function useGameHook() {
   const [user, setUser] = useState<Player | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -64,6 +109,7 @@ function useGameHook() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [teamActionLoading, setTeamActionLoading] = useState(false)
 
   // Theme and settings state
   const [settings, setSettings] = useState<GameSettings>(() => getStoredSettings())
@@ -186,6 +232,7 @@ function useGameHook() {
           isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false),
           players: data.players || [],
           ranking: data.ranking || [],
+          teamInfo: data.teamInfo || null,
         }
         console.log('Setting currentGame to:', newGame) // Debug log
         return newGame
@@ -354,12 +401,137 @@ function useGameHook() {
       }
     })
 
-    newSocket.on('game_started', () => {
+    newSocket.on('game_started', (data) => {
       setCurrentGame(prev => {
         if (!prev) return null
         return {
           ...prev,
-          started: true
+          started: true,
+          teamInfo: data.teamData ? {
+            ...prev.teamInfo,
+            allTeams: data.teamData.teams || prev.teamInfo?.allTeams || []
+          } : prev.teamInfo
+        }
+      })
+    })
+
+    // Team-related event handlers
+    newSocket.on('team_created', (data) => {
+      setCurrentGame(prev => {
+        if (!prev || !prev.teamInfo) return prev
+        const updatedTeams = [...prev.teamInfo.allTeams, data.team]
+        return {
+          ...prev,
+          teamInfo: {
+            ...prev.teamInfo,
+            allTeams: updatedTeams,
+            playerTeam: data.createdBy === user?.id ? data.team : prev.teamInfo.playerTeam
+          }
+        }
+      })
+    })
+
+    newSocket.on('team_updated', (data) => {
+      setCurrentGame(prev => {
+        if (!prev || !prev.teamInfo) return prev
+
+        let updatedTeams = [...prev.teamInfo.allTeams]
+        let updatedPlayerTeam = prev.teamInfo.playerTeam
+
+        if (data.team) {
+          // Player joined a team
+          const existingTeamIndex = updatedTeams.findIndex(t => t.id === data.team.id)
+          if (existingTeamIndex >= 0) {
+            updatedTeams[existingTeamIndex] = data.team
+          } else {
+            updatedTeams.push(data.team)
+          }
+
+          if (data.joinedBy === user?.id) {
+            updatedPlayerTeam = data.team
+          }
+        } else if (data.leftBy) {
+          // Someone left a team
+          if (data.leftBy === user?.id) {
+            updatedPlayerTeam = null
+          }
+
+          // If team was deleted (became empty), remove it from the list
+          if (data.teamDeleted && data.teamId) {
+            updatedTeams = updatedTeams.filter(t => t.id !== data.teamId)
+          } else if (data.teamId) {
+            // Team still exists, just remove the player from it
+            const teamIndex = updatedTeams.findIndex(t => t.id === data.teamId)
+            if (teamIndex >= 0) {
+              updatedTeams[teamIndex] = {
+                ...updatedTeams[teamIndex],
+                players: updatedTeams[teamIndex].players.filter(p => p !== data.leftBy)
+              }
+            }
+          }
+        }
+
+        return {
+          ...prev,
+          teamInfo: {
+            ...prev.teamInfo,
+            allTeams: updatedTeams,
+            playerTeam: updatedPlayerTeam
+          }
+        }
+      })
+    })
+
+    newSocket.on('team_guess', (data) => {
+      // Handle team-specific guess visibility
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          guesses: [...prev.guesses, data.guess]
+        }
+      })
+    })
+
+    newSocket.on('team_rankings_updated', (data) => {
+      setCurrentGame(prev => {
+        if (!prev || !prev.teamInfo) return prev
+        return {
+          ...prev,
+          teamInfo: {
+            ...prev.teamInfo,
+            teamRankings: data.rankings
+          }
+        }
+      })
+    })
+
+    newSocket.on('team_action_success', (data) => {
+      setTeamActionLoading(false)
+      console.log('Team action success:', data.message)
+    })
+
+    newSocket.on('teams_list', (data) => {
+      setCurrentGame(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          teamInfo: {
+            playerTeam: data.playerTeam,
+            allTeams: data.teams,
+            teamRankings: prev.teamInfo?.teamRankings || [],
+            otherTeamsBest: prev.teamInfo?.otherTeamsBest || []
+          }
+        }
+      })
+    })
+
+    newSocket.on('team_info', (data) => {
+      setCurrentGame(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          teamInfo: data
         }
       })
     })
@@ -443,7 +615,7 @@ function useGameHook() {
     }
   }
 
-  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', options?: CreateGameOptions): Promise<string> => {
+  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'team', options?: CreateGameOptions): Promise<string> => {
     if (!isInitialized) {
       setError('Aplicação não foi inicializada')
       throw new Error('Application not initialized')
@@ -463,7 +635,13 @@ function useGameHook() {
         guesses: [],
         finished: false,
         started: type === 'default' || type === 'competitive', // Auto-start for these modes
-        isHost: true // User who creates the game is always the host
+        isHost: true, // User who creates the game is always the host
+        teamInfo: type === 'team' ? {
+          playerTeam: null,
+          allTeams: [],
+          teamRankings: [],
+          otherTeamsBest: []
+        } : null
       }
       console.log('Creating game with initial state:', initialGame) // Debug log
       setCurrentGame(initialGame)
@@ -597,6 +775,92 @@ function useGameHook() {
     // }
   }
 
+  // Team management functions
+  const createTeam = async (teamName: string, color?: string) => {
+    if (!isInitialized || !socket || !isConnected) {
+      setError('Aplicação não foi inicializada ou socket não conectado')
+      return
+    }
+
+    if (!currentGame || currentGame.gameMode !== 'team') {
+      setError('Não está em um jogo de equipes')
+      return
+    }
+
+    setTeamActionLoading(true)
+    setError(null)
+
+    try {
+      socket.emit('create_team', { teamName, color })
+    } catch (err) {
+      setError('Falha ao criar equipe')
+      setTeamActionLoading(false)
+      throw err
+    }
+  }
+
+  const joinTeam = async (teamIdentifier: string) => {
+    if (!isInitialized || !socket || !isConnected) {
+      setError('Aplicação não foi inicializada ou socket não conectado')
+      return
+    }
+
+    if (!currentGame || currentGame.gameMode !== 'team') {
+      setError('Não está em um jogo de equipes')
+      return
+    }
+
+    setTeamActionLoading(true)
+    setError(null)
+
+    try {
+      socket.emit('join_team', { teamIdentifier })
+    } catch (err) {
+      setError('Falha ao entrar na equipe')
+      setTeamActionLoading(false)
+      throw err
+    }
+  }
+
+  const leaveTeam = async () => {
+    if (!isInitialized || !socket || !isConnected) {
+      setError('Aplicação não foi inicializada ou socket não conectado')
+      return
+    }
+
+    if (!currentGame || currentGame.gameMode !== 'team') {
+      setError('Não está em um jogo de equipes')
+      return
+    }
+
+    setTeamActionLoading(true)
+    setError(null)
+
+    try {
+      socket.emit('leave_team')
+    } catch (err) {
+      setError('Falha ao sair da equipe')
+      setTeamActionLoading(false)
+      throw err
+    }
+  }
+
+  const listTeams = () => {
+    if (!isInitialized || !socket || !isConnected) {
+      return
+    }
+
+    socket.emit('list_teams')
+  }
+
+  const getTeamInfo = () => {
+    if (!isInitialized || !socket || !isConnected) {
+      return
+    }
+
+    socket.emit('get_team_info')
+  }
+
   const clearError = () => {
     setError(null)
   }
@@ -653,6 +917,7 @@ function useGameHook() {
     loading,
     error,
     settings,
+    teamActionLoading,
     connect,
     disconnect,
     createGame,
@@ -666,9 +931,18 @@ function useGameHook() {
     refreshUser,
     updatePlayer,
     setTheme,
+    // Team functions
+    createTeam,
+    joinTeam,
+    leaveTeam,
+    listTeams,
+    getTeamInfo,
+    // Team constants
+    TEAM_COLORS,
   }
 }
 
 const [GameProvider, useGame] = contextualize(useGameHook)
 
-export { GameProvider, useGame }
+export { GameProvider, useGame, TEAM_COLORS }
+export type { Team, TeamRanking, TeamInfo }

@@ -4,7 +4,7 @@ interface PlayerTooltipProps {
   username?: string
   closestDistance?: number
   totalGuesses: number
-  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | null
+  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'team' | null
   isVisible: boolean
   position: { x: number; y: number }
   onClose: () => void

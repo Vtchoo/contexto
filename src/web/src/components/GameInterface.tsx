@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import Row from './original_Row'
 import PlayerAvatar from './PlayerAvatar'
 import { PlayerTooltip } from './PlayerTooltip'
+import TeamManagement from './TeamManagement'
 import { strings } from '../constants/strings'
 import { Player } from '@/api/gameApi'
 import { useGame } from '@/contexts/GameContext'
@@ -27,7 +28,7 @@ interface PlayerDisplayData {
 interface GameInterfaceProps {
   gameId?: number
   roomId?: string
-  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | null
+  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'team' | null
   guesses: Guess[]
   onGuess: (word: string) => void
   gameFinished: boolean
@@ -39,12 +40,12 @@ interface GameInterfaceProps {
   players?: string[]
 }
 
-function GameInterface({ 
-  gameId, 
+function GameInterface({
+  gameId,
   roomId,
   gameMode,
-  guesses, 
-  onGuess, 
+  guesses,
+  onGuess,
   gameFinished,
   gameStarted,
   isHost,
@@ -56,6 +57,8 @@ function GameInterface({
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
   const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
+  const [showTeamManagement, setShowTeamManagement] = useState(false)
+  const [teamModalAutoOpened, setTeamModalAutoOpened] = useState(false)
   const [tooltipData, setTooltipData] = useState<{
     isVisible: boolean
     playerId?: string
@@ -77,7 +80,7 @@ function GameInterface({
   const handlePlayerClick = (playerId: string, position: { x: number; y: number }) => {
     const playerRanking = gameContext?.ranking?.find(r => r.playerId === playerId)
     const player = getPlayerById(playerId)
-    
+
     setTooltipData({
       isVisible: true,
       playerId,
@@ -99,10 +102,10 @@ function GameInterface({
     const playersWithGuesses = [...new Set(guesses
       .filter(guess => guess.addedBy && !guess.error)
       .map(guess => guess.addedBy!))]
-    
+
     // Combine current players with players who have made guesses
     const allRelevantPlayers = [...new Set([...players, ...playersWithGuesses])]
-    
+
     // Only process if there are multiple players
     if (allRelevantPlayers.length <= 1) {
       return []
@@ -115,11 +118,11 @@ function GameInterface({
       const isPlayerOnline = players.includes(playerId)
       const hasPlayerMadeGuesses = playersWithGuesses.includes(playerId)
       const player = getPlayerById(playerId)
-      
+
       // Calculate badges based on game mode and rules
       let medalPosition: 1 | 2 | 3 | undefined
       let numberBadge: number | undefined
-      
+
       if (gameMode === 'default') {
         // Coop: number of guesses, no medal
         const playerGuesses = guesses.filter(g => g.addedBy === playerId && !g.error)
@@ -128,7 +131,7 @@ function GameInterface({
         // Competitive: number of guesses, medal for less guesses (must have won)
         // Use ranking data for guess count since guesses list only shows closest guess
         numberBadge = playerRanking?.guessCount || 0
-        
+
         // Show medal only if player has won (closestDistance is 0)
         if (playerRanking?.closestDistance === 0) {
           // Sort completed players by guess count, then by completion time
@@ -143,7 +146,7 @@ function GameInterface({
               const bCompletedAt = new Date(b.completedAt)
               return aCompletedAt.getTime() - bCompletedAt.getTime()
             })
-          
+
           const position = completedPlayers.findIndex(r => r.playerId === playerId) + 1
           if (position <= 3) {
             medalPosition = position as 1 | 2 | 3
@@ -152,14 +155,14 @@ function GameInterface({
       } else if (gameMode === 'stop' || gameMode === 'battle-royale') {
         // Stop/Battle Royale: show number of guesses on badge, rank by closest distance
         numberBadge = playerRanking?.guessCount
-        
+
         // Show medals only when game has finished
         if (gameFinished) {
           // Sort players by closest distance for medal positions
           const sortedByDistance = ranking
             .filter(r => r.closestDistance !== undefined)
             .sort((a, b) => (a.closestDistance || 0) - (b.closestDistance || 0))
-          
+
           const position = sortedByDistance.findIndex(r => r.playerId === playerId) + 1
           if (position <= 3) {
             medalPosition = position as 1 | 2 | 3
@@ -169,7 +172,7 @@ function GameInterface({
         // if (numberBadge !== undefined)
         //   numberBadge += 1
       }
-      
+
       return {
         playerId,
         username: player?.username,
@@ -187,14 +190,14 @@ function GameInterface({
       return playerList.sort((a: PlayerDisplayData, b: PlayerDisplayData) => {
         const aRanking = ranking.find(r => r.playerId === a.playerId)
         const bRanking = ranking.find(r => r.playerId === b.playerId)
-        
+
         const aWon = aRanking?.closestDistance === 0
         const bWon = bRanking?.closestDistance === 0
-        
+
         // Winners first
         if (aWon && !bWon) return -1
         if (!aWon && bWon) return 1
-        
+
         // If both won or both didn't win, sort by guess count
         const aGuesses = aRanking?.guessCount || 0
         const bGuesses = bRanking?.guessCount || 0
@@ -205,15 +208,15 @@ function GameInterface({
       return playerList.sort((a: PlayerDisplayData, b: PlayerDisplayData) => {
         const aRanking = ranking.find(r => r.playerId === a.playerId)
         const bRanking = ranking.find(r => r.playerId === b.playerId)
-        
+
         const aDistance = aRanking?.closestDistance ?? Infinity
         const bDistance = bRanking?.closestDistance ?? Infinity
-        
+
         // Sort by closest distance first
         if (aDistance !== bDistance) {
           return aDistance - bDistance
         }
-        
+
         // Tiebreaker: least guesses
         const aGuesses = aRanking?.guessCount || 0
         const bGuesses = bRanking?.guessCount || 0
@@ -228,20 +231,21 @@ function GameInterface({
   const getGameModeDisplayName = (mode: string | null) => {
     const modeNames = {
       'default': '🤝 Clássico',
-      'competitive': '🎯 Competitivo', 
+      'competitive': '🎯 Competitivo',
       'battle-royale': '⚔️ Battle Royale',
-      'stop': '⚡ Stop'
+      'stop': '⚡ Stop',
+      'team': '👥 Squads',
     }
     return mode ? modeNames[mode as keyof typeof modeNames] || mode : null
   }
 
   const handleRoomIdClick = async () => {
     if (!roomId) return
-    
+
     try {
       const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`
       await navigator.clipboard.writeText(url)
-      
+
       setShowCopiedFeedback(true)
       setTimeout(() => setShowCopiedFeedback(false), 2000)
     } catch (error) {
@@ -253,7 +257,7 @@ function GameInterface({
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      
+
       setShowCopiedFeedback(true)
       setTimeout(() => setShowCopiedFeedback(false), 2000)
     }
@@ -263,7 +267,7 @@ function GameInterface({
   const sortedGuesses = [...guesses]
     .filter(guess => !guess.error)
     .sort((a, b) => a.distance - b.distance)
-  
+
   const playerGuesses = guesses.filter(guess => guess.addedBy === user.id)
 
   const errorGuesses = guesses.filter(guess => guess.error)
@@ -280,13 +284,21 @@ function GameInterface({
     }
   }, [loading])
 
+  // Auto-open team management modal for team games (only once)
+  useEffect(() => {
+    if (gameMode === 'team' && !loading && !teamModalAutoOpened) {
+      setShowTeamManagement(true)
+      setTeamModalAutoOpened(true)
+    }
+  }, [gameMode, loading, teamModalAutoOpened])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!inputValue.trim() || loading || gameFinished || !gameStarted) return
 
     const word = inputValue.trim().toLowerCase()
-    
+
     // Basic validation
     if (word.length < 2) {
       return // Too short
@@ -312,21 +324,21 @@ function GameInterface({
     }
   }
 
-  const isWinner = gameMode === 'default' 
+  const isWinner = gameMode === 'default'
     ? sortedGuesses.some(guess => guess.distance === 0) // In default mode, anyone finding the word means everyone wins
     : playerGuesses.some(guess => guess.distance === 0) // In competitive modes, only individual wins count
-  
+
   // Check if another player won in stop/battle royale modes
   const otherPlayerWon = useMemo(() => {
     if (gameMode !== 'stop' && gameMode !== 'battle-royale') return null
     if (!gameFinished) return null
     if (isWinner) return null // Current player won, no need to show other player message
-    
+
     // Find the winner from ranking data
     const winner = gameContext?.ranking?.find(r => r.closestDistance === 0)
     if (winner) {
       const winnerName = getPlayerById(winner.playerId)?.username || 'Jogador'
-      
+
       return {
         playerId: winner.playerId,
         username: winnerName,
@@ -336,32 +348,32 @@ function GameInterface({
     }
     return null
   }, [gameMode, gameFinished, isWinner, gameContext?.ranking, gameContext?.answerWord, getPlayerById])
-  
+
   // Get the attempted/highlighted word data for message display, fallback to last guess
   const lastGuessData = playerGuesses.length > 0 ? [...playerGuesses].pop() : null
   const attemptedWordData = highlightedWord ? guesses.find(guess => guess.word === highlightedWord) : lastGuessData
 
   // Show message based on game state
   let message = null
-  
+
   if (loading) {
     message = (
       <div className="message">
         <div className="message-text">
           <div className="loading-text">
-            <span style={{'--i': 1} as React.CSSProperties}>C</span>
-            <span style={{'--i': 2} as React.CSSProperties}>a</span>
-            <span style={{'--i': 3} as React.CSSProperties}>l</span>
-            <span style={{'--i': 4} as React.CSSProperties}>c</span>
-            <span style={{'--i': 5} as React.CSSProperties}>u</span>
-            <span style={{'--i': 6} as React.CSSProperties}>l</span>
-            <span style={{'--i': 7} as React.CSSProperties}>a</span>
-            <span style={{'--i': 8} as React.CSSProperties}>n</span>
-            <span style={{'--i': 9} as React.CSSProperties}>d</span>
-            <span style={{'--i': 10} as React.CSSProperties}>o</span>
-            <span style={{'--i': 11} as React.CSSProperties}>.</span>
-            <span style={{'--i': 12} as React.CSSProperties}>.</span>
-            <span style={{'--i': 13} as React.CSSProperties}>.</span>
+            <span style={{ '--i': 1 } as React.CSSProperties}>C</span>
+            <span style={{ '--i': 2 } as React.CSSProperties}>a</span>
+            <span style={{ '--i': 3 } as React.CSSProperties}>l</span>
+            <span style={{ '--i': 4 } as React.CSSProperties}>c</span>
+            <span style={{ '--i': 5 } as React.CSSProperties}>u</span>
+            <span style={{ '--i': 6 } as React.CSSProperties}>l</span>
+            <span style={{ '--i': 7 } as React.CSSProperties}>a</span>
+            <span style={{ '--i': 8 } as React.CSSProperties}>n</span>
+            <span style={{ '--i': 9 } as React.CSSProperties}>d</span>
+            <span style={{ '--i': 10 } as React.CSSProperties}>o</span>
+            <span style={{ '--i': 11 } as React.CSSProperties}>.</span>
+            <span style={{ '--i': 12 } as React.CSSProperties}>.</span>
+            <span style={{ '--i': 13 } as React.CSSProperties}>.</span>
           </div>
         </div>
       </div>
@@ -376,7 +388,7 @@ function GameInterface({
     message = (
       <div className="message">
         <div>
-          <Row 
+          <Row
             // guess={attemptedWordData}
             // highlight={true}
             word={attemptedWordData.word}
@@ -403,12 +415,28 @@ function GameInterface({
               }}>
                 Modo: {getGameModeDisplayName(gameMode)}
               </div>
-            )}
-          </div>
+            )}            {gameMode === 'team' && (
+              <button
+                onClick={() => setShowTeamManagement(true)}
+                style={{
+                  marginTop: '8px',
+                  padding: '6px 12px',
+                  backgroundColor: 'var(--button-bg, #007bff)',
+                  color: 'var(--button-text, #ffffff)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                👥 Gerenciar Equipes
+              </button>
+            )}          </div>
           <button className="btn">⋮</button>
         </div>
-        
-        {!gameStarted && (gameMode === 'stop' || gameMode === 'battle-royale') && (
+
+        {!gameStarted && (gameMode === 'stop' || gameMode === 'battle-royale' || gameMode === 'team') && (
           <div className="start-game-section" style={{
             textAlign: 'center',
             padding: '2rem',
@@ -421,9 +449,13 @@ function GameInterface({
               🎮 Jogo Aguardando Início
             </h3>
             <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
-              {gameMode === 'stop' 
+              {gameMode === 'stop'
                 ? 'Este é um jogo Stop - todos os jogadores devem começar ao mesmo tempo!'
-                : 'Este é um jogo Battle Royale - todos os jogadores devem começar ao mesmo tempo!'
+                : gameMode === 'battle-royale'
+                  ? 'Este é um jogo Battle Royale - todos os jogadores devem começar ao mesmo tempo!'
+                  : gameMode === 'team'
+                    ? 'Este é um jogo de Equipes - todos os jogadores devem entrar em equipes antes de começar!'
+                    : null
               }
             </p>
             {isHost ? (
@@ -451,7 +483,7 @@ function GameInterface({
             )}
           </div>
         )}
-        
+
         {isWinner && (
           <div className="end-msg">
             <p>🎉 {strings.game.congratulations}! {gameMode === 'default' && isMultiplayer ? strings.game.youAllWon : strings.game.youWon}</p>
@@ -479,11 +511,11 @@ function GameInterface({
           {roomId && (
             <>
               <span className="label">SALA:</span>{' '}
-              <span 
+              <span
                 onClick={handleRoomIdClick}
-                style={{ 
-                  fontWeight: 'bold', 
-                  fontSize: '1.1em', 
+                style={{
+                  fontWeight: 'bold',
+                  fontSize: '1.1em',
                   color: '#28a745',
                   cursor: 'pointer',
                   textDecoration: 'underline',
@@ -553,10 +585,10 @@ function GameInterface({
               {playerDisplayData.map((player) => {
                 const playerRanking = gameContext?.ranking?.find(r => r.playerId === player.playerId)
                 return (
-                  <PlayerAvatar 
-                    key={player.playerId} 
-                    id={player.playerId} 
-                    username={player.username} 
+                  <PlayerAvatar
+                    key={player.playerId}
+                    id={player.playerId}
+                    username={player.username}
                     avatarUrl={player.avatarUrl}
                     size={36}
                     transparent={player.transparent}
@@ -591,7 +623,7 @@ function GameInterface({
             //   guess={guess}
             //   highlight={false}
             // />
-            <Row 
+            <Row
               key={`${guess.word}-${index}`}
               word={guess.word}
               distance={guess.distance}
@@ -602,7 +634,7 @@ function GameInterface({
               highlightPlayerGuess={gameMode !== 'default' && guess.addedBy !== user.id} // if game is coop, no need to highlight other players
             />
           ))}
-          
+
           {/* Show error guesses at the bottom */}
           {/* {errorGuesses.map((guess, index) => (
             <Row 
@@ -612,6 +644,11 @@ function GameInterface({
             />
           ))} */}
         </div>
+
+        <TeamManagement
+          isOpen={showTeamManagement}
+          onClose={() => setShowTeamManagement(false)}
+        />
       </main>
     </div>
   )

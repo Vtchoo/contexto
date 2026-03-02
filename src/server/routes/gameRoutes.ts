@@ -26,7 +26,7 @@ export function setupGameRoutes(gameManager: GameManager, userManager: UserManag
       const { type, allowTips, allowGiveUp, maxPlayers } = req.body
       let gameId: number | Date | 'random' | undefined = req.body.gameId
 
-      if (!['default', 'competitive', 'battle-royale', 'stop'].includes(type)) {
+      if (!['default', 'competitive', 'battle-royale', 'stop', 'team'].includes(type)) {
         return res.status(400).json({ error: 'Invalid game type' })
       }
 
