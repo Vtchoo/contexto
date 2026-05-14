@@ -1,3 +1,4 @@
+import { MoreThan } from 'typeorm'
 import { Player } from '../models/Player'
 import { getPlayerRepository } from '../repositories/PlayersRepository'
 import snowflakeGenerator from '../utils/snowflake'
@@ -134,8 +135,16 @@ export class UserManager {
   }
 
   async getActiveUsersCount(): Promise<number> {
-    const users = await this.getAllUsers()
-    return users.filter(user => user.isActive()).length
+    try {
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000)
+      return await this.userRepository.count({
+        where: { lastActivity: MoreThan(oneDayAgo) }
+      })
+    } catch (error) {
+      console.error('Failed to count active users:', error)
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000)
+      return Array.from(this.users.values()).filter(u => u.lastActivity > oneDayAgo).length
+    }
   }
 
   async updateUserActivity(tokenOrId: string): Promise<void> {

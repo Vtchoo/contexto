@@ -14,6 +14,7 @@ class ContextoManager {
     private playerGames: Map<string, string> = new Map() // playerId -> gameId , used to track which game a player is currently playing
 
     private memoryCache: Map<string, GameWord> = new Map() // In-memory cache for fast access during session
+    private prefetchInProgress: Set<number> = new Set() // Guards against concurrent prefetch for the same gameId
 
     public getCurrentOrCreateGame(playerId: string, gameType: 'default' | 'competitive' = 'default', gameIdOrDate?: number | Date) {
         let game = this.getCurrentPlayerGame(playerId)
@@ -64,6 +65,13 @@ class ContextoManager {
 
     private async prefetchClosestWords(gameId: number) {
 
+        // Prevent concurrent prefetch for the same gameId
+        if (this.prefetchInProgress.has(gameId)) {
+            console.log(`Game ${gameId} prefetch already in progress, skipping`)
+            return
+        }
+        this.prefetchInProgress.add(gameId)
+
         // Prefetch words for the game ID
         // const queryRunner = dataSource.createQueryRunner()
         // const transaction = await queryRunner.startTransaction()
@@ -84,23 +92,20 @@ class ContextoManager {
                 return
             }
             const repository = getCachedWordsRepository()
-            const existingWords = await repository.find({
-                where: { gameId },
-                select: ['word']
-            })
-            const existingWordsSet = new Set(existingWords.map(w => w.word.toLowerCase()))
-            // Filter out words that are already cached
-            const newWords = words.filter((word: string) => !existingWordsSet.has(word.toLowerCase()))
-            if (newWords.length === 0) {
-                console.log(`All words for game ${gameId} are already cached, skipping prefetch`)
-                return
-            }
-            await repository.save(newWords.map((word: string, index) => ({
-                gameId,
-                word: word,
-                lemma: word,
-                distance: index,
-            })))
+
+            // Use INSERT ... ON CONFLICT DO NOTHING to avoid reading all existing words
+            await repository
+                .createQueryBuilder()
+                .insert()
+                .into('cached_words')
+                .values(words.map((word: string, index: number) => ({
+                    gameId,
+                    word: word.toLowerCase(),
+                    lemma: word,
+                    distance: index,
+                })))
+                .orIgnore()
+                .execute()
 
             // Mark this game as prefetched
             const prefetchedGameRepository = getPrefetchedGamesRepository()
@@ -109,6 +114,8 @@ class ContextoManager {
             })
         } catch (error) {
             console.log(`Error prefetching words for game ${gameId}:`, error)
+        } finally {
+            this.prefetchInProgress.delete(gameId)
         }
     }
 
