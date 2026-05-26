@@ -5,6 +5,7 @@ import snowflakeGenerator from '../../utils/snowflake'
 import { ContextoDefaultGame } from '../../game/ContextoDefaultGame'
 import { ContextoCompetitiveGame } from '../../game/ContextoCompetitiveGame'
 import { ContextoBattleRoyaleGame } from '../../game/ContextoBattleRoyaleGame'
+import { ContextoTeamsGame } from '../../game/ContextoTeamsGame'
 
 export function setupRoomRoutes(gameManager: GameManager, userManager: UserManager) {
   const router = Router()
@@ -37,6 +38,11 @@ export function setupRoomRoutes(gameManager: GameManager, userManager: UserManag
         extraInfo = {
           playersProgress: game.getLeaderboard()
         }
+      } else if (game instanceof ContextoTeamsGame) {
+        gameType = 'teams'
+        extraInfo = {
+          teams: game.getTeamsState()
+        }
       } else if (game instanceof ContextoDefaultGame) {
         gameType = 'default'
       }
@@ -66,13 +72,15 @@ export function setupRoomRoutes(gameManager: GameManager, userManager: UserManag
       let games = gameManager.getActiveGames()
 
       // Filter by game type if specified
-      if (type && ['default', 'competitive', 'battle-royale'].includes(type as string)) {
+      if (type && ['default', 'competitive', 'battle-royale', 'teams'].includes(type as string)) {
         games = games.filter(game => {
           switch (type) {
             case 'battle-royale':
               return game instanceof ContextoBattleRoyaleGame
             case 'competitive':
               return game instanceof ContextoCompetitiveGame
+            case 'teams':
+              return game instanceof ContextoTeamsGame
             case 'default':
               return game instanceof ContextoDefaultGame
             default:
@@ -90,6 +98,8 @@ export function setupRoomRoutes(gameManager: GameManager, userManager: UserManag
           gameType = 'battle-royale'
         } else if (game instanceof ContextoCompetitiveGame) {
           gameType = 'competitive'
+        } else if (game instanceof ContextoTeamsGame) {
+          gameType = 'teams'
         }
 
         return {
@@ -124,6 +134,8 @@ export function setupRoomRoutes(gameManager: GameManager, userManager: UserManag
           gameType = 'battle-royale'
         } else if (game instanceof ContextoCompetitiveGame) {
           gameType = 'competitive'
+        } else if (game instanceof ContextoTeamsGame) {
+          gameType = 'teams'
         }
 
         return {

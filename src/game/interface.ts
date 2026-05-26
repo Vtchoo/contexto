@@ -43,6 +43,16 @@ export interface PlayerScore {
     completedAt?: Date
 }
 
+export interface TeamState {
+    id: string
+    name: string
+    color: string
+    players: string[]
+    guessCount: number
+    closestDistance?: number
+    won?: boolean
+}
+
 export interface GameState {
     id: string
     started: boolean
@@ -50,4 +60,7 @@ export interface GameState {
     players: string[]
     guesses: Guess[]
     ranking?: PlayerScore[]
+    teams?: TeamState[]
+    playerTeamId?: string
+    winnerTeamId?: string
 }

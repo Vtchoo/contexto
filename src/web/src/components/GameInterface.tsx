@@ -3,8 +3,9 @@ import Row from './original_Row'
 import PlayerAvatar from './PlayerAvatar'
 import { PlayerTooltip } from './PlayerTooltip'
 import { strings } from '../constants/strings'
-import { Player } from '@/api/gameApi'
+import { Player, TeamState } from '@/api/gameApi'
 import { useGame } from '@/contexts/GameContext'
+import { TeamsModal } from './TeamsModal'
 
 interface Guess {
   word: string
@@ -27,7 +28,7 @@ interface PlayerDisplayData {
 interface GameInterfaceProps {
   gameId?: number
   roomId?: string
-  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | null
+  gameMode?: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams' | null
   guesses: Guess[]
   onGuess: (word: string) => void
   gameFinished: boolean
@@ -55,6 +56,7 @@ function GameInterface({
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
   const [showCopiedFeedback, setShowCopiedFeedback] = useState(false)
+  const [showTeamsModal, setShowTeamsModal] = useState(false)
   const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
   const [tooltipData, setTooltipData] = useState<{
     isVisible: boolean
@@ -71,7 +73,7 @@ function GameInterface({
   })
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { getPlayerById, currentGame: gameContext } = useGame()
+  const { getPlayerById, currentGame: gameContext, createTeam, joinTeam } = useGame()
 
   // Handle player avatar click to show tooltip
   const handlePlayerClick = (playerId: string, position: { x: number; y: number }) => {
@@ -230,10 +232,41 @@ function GameInterface({
       'default': '🤝 Clássico',
       'competitive': '🎯 Competitivo', 
       'battle-royale': '⚔️ Battle Royale',
-      'stop': '⚡ Stop'
+      'stop': '⚡ Stop',
+      'teams': '👥 Times'
     }
     return mode ? modeNames[mode as keyof typeof modeNames] || mode : null
   }
+
+  const teams = gameContext?.teams || []
+  const groupedPlayersByTeam = useMemo(() => {
+    if (gameMode !== 'teams') {
+      return [] as Array<{ team: TeamState; players: PlayerDisplayData[] }>
+    }
+
+    return teams.map(team => {
+      const teamPlayers = team.players.map((playerId) => {
+        const playerRanking = gameContext?.ranking?.find(r => r.playerId === playerId)
+        const player = getPlayerById(playerId)
+        return {
+          playerId,
+          username: player?.username,
+          avatarUrl: player?.avatarUrl,
+          isOnline: players.includes(playerId),
+          transparent: !players.includes(playerId),
+          numberBadge: undefined,
+          medalPosition: undefined,
+          closestDistance: playerRanking?.closestDistance,
+          totalGuesses: playerRanking?.guessCount || 0,
+        }
+      })
+
+      return {
+        team,
+        players: teamPlayers,
+      }
+    })
+  }, [gameMode, teams, getPlayerById, players, gameContext?.ranking])
 
   const handleRoomIdClick = async () => {
     if (!roomId) return
@@ -265,8 +298,6 @@ function GameInterface({
     .sort((a, b) => a.distance - b.distance)
   
   const playerGuesses = guesses.filter(guess => guess.addedBy === user.id)
-
-  const errorGuesses = guesses.filter(guess => guess.error)
 
   // Detect if it's a multiplayer game based on whether there are guesses from different players
   const isMultiplayer = useMemo(() => {
@@ -312,16 +343,31 @@ function GameInterface({
     }
   }
 
-  const isWinner = gameMode === 'default' 
-    ? sortedGuesses.some(guess => guess.distance === 0) // In default mode, anyone finding the word means everyone wins
-    : playerGuesses.some(guess => guess.distance === 0) // In competitive modes, only individual wins count
+  const isWinner = gameMode === 'default'
+    ? sortedGuesses.some(guess => guess.distance === 0)
+    : gameMode === 'teams'
+      ? !!gameContext?.winnerTeam?.players.includes(user.id)
+      : playerGuesses.some(guess => guess.distance === 0)
   
   // Check if another player won in stop/battle royale modes
   const otherPlayerWon = useMemo(() => {
-    if (gameMode !== 'stop' && gameMode !== 'battle-royale') return null
+    if (gameMode !== 'stop' && gameMode !== 'battle-royale' && gameMode !== 'teams') return null
     if (!gameFinished) return null
     if (isWinner) return null // Current player won, no need to show other player message
     
+    if (gameMode === 'teams') {
+      const winnerTeam = gameContext?.winnerTeam
+      if (winnerTeam) {
+        return {
+          playerId: winnerTeam.id,
+          username: `Time ${winnerTeam.name}`,
+          guessCount: winnerTeam.guessCount,
+          answerWord: gameContext?.answerWord,
+        }
+      }
+      return null
+    }
+
     // Find the winner from ranking data
     const winner = gameContext?.ranking?.find(r => r.closestDistance === 0)
     if (winner) {
@@ -408,7 +454,7 @@ function GameInterface({
           <button className="btn">⋮</button>
         </div>
         
-        {!gameStarted && (gameMode === 'stop' || gameMode === 'battle-royale') && (
+        {!gameStarted && (gameMode === 'stop' || gameMode === 'battle-royale' || gameMode === 'teams') && (
           <div className="start-game-section" style={{
             textAlign: 'center',
             padding: '2rem',
@@ -423,7 +469,9 @@ function GameInterface({
             <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
               {gameMode === 'stop' 
                 ? 'Este é um jogo Stop - todos os jogadores devem começar ao mesmo tempo!'
-                : 'Este é um jogo Battle Royale - todos os jogadores devem começar ao mesmo tempo!'
+                : gameMode === 'battle-royale'
+                  ? 'Este é um jogo Battle Royale - todos os jogadores devem começar ao mesmo tempo!'
+                  : 'Este é um jogo por times - todos devem entrar em um time antes de começar!'
               }
             </p>
             {isHost ? (
@@ -461,7 +509,7 @@ function GameInterface({
         {otherPlayerWon && (
           <div className="end-msg" style={{ backgroundColor: '#f8d7da', borderColor: '#f5c6cb', color: '#721c24' }}>
             <p>
-              {gameMode === 'stop' ? '⚡' : '⚔️'} <strong>{otherPlayerWon.username}</strong> venceu em{' '}
+              {gameMode === 'stop' ? '⚡' : gameMode === 'teams' ? '👥' : '⚔️'} <strong>{otherPlayerWon.username}</strong> venceu em{' '}
               <strong>{otherPlayerWon.guessCount}</strong> tentativa{otherPlayerWon.guessCount !== 1 ? 's' : ''}!
               {otherPlayerWon.answerWord && (
                 <>
@@ -525,6 +573,26 @@ function GameInterface({
           <span>
             {gameMode === 'default' ? sortedGuesses.length : playerGuesses.filter(guess => !guess.error).length}
           </span>
+          {gameMode === 'teams' && (
+            <>
+              &nbsp;&nbsp;&nbsp;
+              <button
+                type="button"
+                onClick={() => setShowTeamsModal(true)}
+                style={{
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '0.15rem 0.5rem',
+                  background: 'var(--card-bg)',
+                  color: 'var(--text-color)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Ver times
+              </button>
+            </>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -537,17 +605,23 @@ function GameInterface({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={strings.game.enterWord}
-            disabled={loading || gameFinished || !gameStarted}
+            disabled={loading || gameFinished || !gameStarted || (gameMode === 'teams' && !gameContext?.playerTeamId)}
             autoComplete="off"
             autoCapitalize="off"
             enterKeyHint="send"
           />
         </form>
 
+        {gameMode === 'teams' && !gameContext?.playerTeamId && (
+          <div className="message" style={{ marginTop: '0.5rem' }}>
+            <div className="message-text">Entre em um time para poder jogar.</div>
+          </div>
+        )}
+
         {message}
 
         {/* Show all players who have participated in the game */}
-        {playerDisplayData.length > 0 && (
+        {gameMode !== 'teams' && playerDisplayData.length > 0 && (
           <div className="player-list" style={{ paddingBlock: '1rem' }}>
             <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
               {playerDisplayData.map((player) => {
@@ -569,6 +643,38 @@ function GameInterface({
                 )
               })}
             </ul>
+          </div>
+        )}
+
+        {gameMode === 'teams' && groupedPlayersByTeam.length > 0 && (
+          <div style={{ paddingBlock: '1rem' }}>
+            {groupedPlayersByTeam.map(({ team, players: groupedPlayers }) => (
+              <div key={team.id} style={{ marginBottom: '0.75rem' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '0.4rem',
+                  fontWeight: 700,
+                }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: team.color }} />
+                  <span>{team.name}</span>
+                </div>
+                <ul style={{ display: 'flex', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
+                  {groupedPlayers.map((player) => (
+                    <PlayerAvatar
+                      key={player.playerId}
+                      id={player.playerId}
+                      username={player.username}
+                      avatarUrl={player.avatarUrl}
+                      size={36}
+                      transparent={player.transparent}
+                      onClick={(_, position) => handlePlayerClick(player.playerId, position)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         )}
 
@@ -612,6 +718,17 @@ function GameInterface({
             />
           ))} */}
         </div>
+
+        <TeamsModal
+          isOpen={showTeamsModal}
+          onClose={() => setShowTeamsModal(false)}
+          teams={teams}
+          playerTeamId={gameContext?.playerTeamId}
+          gameStarted={gameStarted}
+          getPlayerName={(playerId) => getPlayerById(playerId)?.username || playerId}
+          onCreateTeam={createTeam}
+          onJoinTeam={joinTeam}
+        />
       </main>
     </div>
   )

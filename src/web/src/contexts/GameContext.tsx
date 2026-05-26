@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { gameApi, userApi, healthApi, Player, Guess, CreateGameOptions } from '../api/gameApi'
+import { gameApi, userApi, healthApi, Player, Guess, CreateGameOptions, TeamState } from '../api/gameApi'
 import { KEEP_ALIVE_CONFIG } from '@/utils/keepAlive'
 import contextualize from '@/utils/contextualize'
 import { useCache } from '@/hooks/useCache'
@@ -11,12 +11,16 @@ const socketUrl = import.meta.env.VITE_API_URL ||
 interface CurrentGame {
   roomId: string
   gameId: string
-  gameMode: 'default' | 'competitive' | 'battle-royale' | 'stop'
+  gameMode: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams'
   guesses: Guess[]
   finished: boolean
   started: boolean
   isHost: boolean
   players?: string[] // List of player IDs in the game
+  teams?: TeamState[]
+  playerTeamId?: string
+  teamRequired?: boolean
+  winnerTeam?: TeamState
   ranking?: Array<{
     playerId: string
     guessCount: number
@@ -185,6 +189,9 @@ function useGameHook() {
           started: data.started !== undefined ? data.started : (prev?.started || (prev?.gameMode === 'default' || prev?.gameMode === 'competitive')),
           isHost: data.isHost !== undefined ? data.isHost : (prev?.isHost || false),
           players: data.players || [],
+          teams: data.teams || [],
+          playerTeamId: data.playerTeamId,
+          teamRequired: data.teamRequired || false,
           ranking: data.ranking || [],
         }
         console.log('Setting currentGame to:', newGame) // Debug log
@@ -345,6 +352,7 @@ function useGameHook() {
         return {
           ...prev,
           finished: true,
+          winnerTeam: data.winnerTeam,
           answerWord: data.answer // Store the answer word from server
         }
       })
@@ -360,6 +368,28 @@ function useGameHook() {
         return {
           ...prev,
           started: true
+        }
+      })
+    })
+
+    newSocket.on('team_joined', (data) => {
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          teams: data.teams || prev.teams,
+          playerTeamId: data.playerTeamId,
+          teamRequired: data.teamRequired,
+        }
+      })
+    })
+
+    newSocket.on('teams_updated', (data) => {
+      setCurrentGame(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          teams: data.teams || prev.teams,
         }
       })
     })
@@ -443,7 +473,7 @@ function useGameHook() {
     }
   }
 
-  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', options?: CreateGameOptions): Promise<string> => {
+  const createGame = async (type: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams', options?: CreateGameOptions): Promise<string> => {
     if (!isInitialized) {
       setError('Aplicação não foi inicializada')
       throw new Error('Application not initialized')
@@ -463,6 +493,8 @@ function useGameHook() {
         guesses: [],
         finished: false,
         started: type === 'default' || type === 'competitive', // Auto-start for these modes
+        teams: [],
+        teamRequired: type === 'teams',
         isHost: true // User who creates the game is always the host
       }
       console.log('Creating game with initial state:', initialGame) // Debug log
@@ -560,6 +592,24 @@ function useGameHook() {
 
     console.log('Emitting start_game event') // Debug log
     socket.emit('start_game')
+  }
+
+  const createTeam = (name: string, color: string) => {
+    if (!socket || !isConnected || !currentGame?.roomId) {
+      setError('Não foi possível criar o time')
+      return
+    }
+
+    socket.emit('create_team', { name, color })
+  }
+
+  const joinTeam = (teamId: string) => {
+    if (!socket || !isConnected || !currentGame?.roomId) {
+      setError('Não foi possível entrar no time')
+      return
+    }
+
+    socket.emit('join_team', { teamId })
   }
 
   const refreshUser = async (): Promise<void> => {
@@ -661,6 +711,8 @@ function useGameHook() {
     leaveRoom,
     makeGuess,
     startGame,
+    createTeam,
+    joinTeam,
     clearError,
     getPlayerById,
     refreshUser,

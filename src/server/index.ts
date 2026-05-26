@@ -19,7 +19,7 @@ import { Player } from '../models/Player'
 
 const corsOrigin = env.FRONTEND_URL || (env.NODE_ENV === 'production' 
 	? true // Allow all origins in production, or specify your domain
-	: ["http://localhost:3000", "http://localhost:3002"])
+	: ["http://localhost:3000", "http://localhost:3002", "http://localhost:5173"])
 
 const app = express()
 const server = createServer(app)

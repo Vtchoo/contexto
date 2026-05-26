@@ -355,6 +355,7 @@ function HomePage() {
     { key: 'default' as GameMode, name: 'Clássico', description: 'Jogo tradicional ou cooperativo' },
     { key: 'competitive' as GameMode, name: 'Competitivo', description: 'Cada um por si' },
     { key: 'stop' as GameMode, name: 'Stop', description: 'O primeiro a acertar ganha' },
+    { key: 'teams' as GameMode, name: 'Times', description: 'O primeiro time a acertar ganha' },
     { key: 'battle-royale' as GameMode, name: 'Battle Royale', description: '"Alguém já usou essa palavra"' }
   ]
 

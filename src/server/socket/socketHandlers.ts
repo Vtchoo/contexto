@@ -4,7 +4,7 @@ import { UserManager } from '../UserManager'
 import { Player } from '../../models/Player'
 import snowflakeGenerator from '../../utils/snowflake'
 import JWTService from '../../utils/jwt'
-import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame } from '../../game'
+import { ContextoBattleRoyaleGame, ContextoCompetitiveGame, ContextoDefaultGame, ContextoStopGame, ContextoTeamsGame } from '../../game'
 import { IGame } from '../../game/interface'
 import * as zod from 'zod'
 
@@ -24,13 +24,29 @@ const getGameMode = (game: IGame): string => {
     return 'battle-royale'
   } else if (game instanceof ContextoStopGame) {
     return 'stop'
+  } else if (game instanceof ContextoTeamsGame) {
+    return 'teams'
   }
   return 'default'
 }
 
+const isTeamsGame = (game: IGame): game is ContextoTeamsGame => game instanceof ContextoTeamsGame
+
 export function setupSocketHandlers(io: Server, gameManager: GameManager, userManager: UserManager) {
   // Track current socket ID for each user to prevent race conditions
   const userSocketMap = new Map<string, string>()
+
+  const emitTeamsUpdate = (roomId: string, game: IGame) => {
+    if (!isTeamsGame(game)) {
+      return
+    }
+
+    io.to(roomId).emit('teams_updated', {
+      teams: game.getTeamsState(),
+      started: game.started,
+      finished: game.finished,
+    })
+  }
 
   io.on('connection', async (socket: Socket) => {
     console.log(`🔌 User connected: ${socket.id}`)
@@ -115,10 +131,10 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
             userId: socketUser.userId,
             username: socketUser.username
           })
-        } else {
-          // Join new room
-          socket.join(roomId)
         }
+
+        // Join target room
+        socket.join(roomId)
 
         // Update user's current socket ID (in case of reconnection)
         userSocketMap.set(socketUser.userId, socket.id)
@@ -148,7 +164,13 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           gameMode: getGameMode(game),
           players: gameState.players,
           ranking: gameState.ranking,
+          teams: gameState.teams,
+          playerTeamId: gameState.playerTeamId,
+          winnerTeamId: gameState.winnerTeamId,
+          teamRequired: isTeamsGame(game) ? !gameState.playerTeamId : false,
         })
+
+        emitTeamsUpdate(roomId, game)
 
         console.log(`🏠 User ${socketUser.userId} joined room ${roomId}`)
       } catch (error: any) {
@@ -171,6 +193,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         }
 
         const roomId = currentRoom
+        const roomGame = gameManager.getGame(roomId)
 
         // Remove user from game
         gameManager.removeUserFromGame(socketUser.userId, roomId)
@@ -188,6 +211,10 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         })
 
         socket.emit('room_left', { roomId })
+
+        if (roomGame) {
+          emitTeamsUpdate(roomId, roomGame)
+        }
 
         console.log(`🚪 User ${socketUser.userId} left room ${roomId}`)
       } catch (error: any) {
@@ -244,15 +271,38 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
           guessCount: game.guessCount
         })
 
-        // Emit guess to other players in room (with spoiler for multiplayer games)
-        socket.to(roomId).emit('player_guess', {
-          word: game instanceof ContextoDefaultGame ? guess.word : ``, // Spoiler for valid guesses in default game
-          distance: guess.distance,
-          error: guess.error,
-          gameFinished: game.finished,
-          addedBy: socketUser.userId,
-          hidden: game instanceof ContextoDefaultGame ? false : true, // Hide guesses in multiplayer games
-        })
+        // Emit guess updates to other players.
+        if (isTeamsGame(game)) {
+          const teamId = game.getPlayerTeamId(socketUser.userId)
+          if (teamId) {
+            const teammates = game.getTeamPlayers(teamId).filter(playerId => playerId !== socketUser!.userId)
+            for (const teammateId of teammates) {
+              const teammateSocketId = userSocketMap.get(teammateId)
+              if (!teammateSocketId) {
+                continue
+              }
+              io.to(teammateSocketId).emit('player_guess', {
+                word: guess.word,
+                distance: guess.distance,
+                error: guess.error,
+                gameFinished: game.finished,
+                addedBy: socketUser.userId,
+                hidden: false,
+              })
+            }
+          }
+        } else {
+          socket.to(roomId).emit('player_guess', {
+            word: game instanceof ContextoDefaultGame ? guess.word : ``,
+            distance: guess.distance,
+            error: guess.error,
+            gameFinished: game.finished,
+            addedBy: socketUser.userId,
+            hidden: game instanceof ContextoDefaultGame ? false : true,
+          })
+        }
+
+        emitTeamsUpdate(roomId, game)
 
         // If game finished, update user stats
         if (game.finished && guess.distance === 0) {
@@ -271,6 +321,7 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
               username: socketUser.username,
               guessCount: game.guessCount
             },
+            winnerTeam: isTeamsGame(game) ? game.getWinnerTeam() : undefined,
             answer: guess.word
           })
         }
@@ -322,6 +373,72 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
         })
 
         console.log(`🚀 Game started in room ${roomId} by host ${socketUser.userId}`)
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    socket.on('create_team', async (data: { name: string; color: string }) => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
+        if (!currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const game = gameManager.getGame(currentRoom)
+        if (!game || !isTeamsGame(game)) {
+          socket.emit('error', { error: 'This room is not a teams game' })
+          return
+        }
+
+        game.createTeam(socketUser.userId, data.name, data.color)
+        const gameState = game.getCurrentGameState(socketUser.userId)
+
+        emitTeamsUpdate(currentRoom, game)
+        socket.emit('team_joined', {
+          playerTeamId: gameState.playerTeamId,
+          teams: gameState.teams,
+          teamRequired: !gameState.playerTeamId,
+        })
+      } catch (error: any) {
+        socket.emit('error', { error: error.message })
+      }
+    })
+
+    socket.on('join_team', async (data: { teamId: string }) => {
+      try {
+        if (!socketUser) {
+          socket.emit('error', { error: 'Not authenticated' })
+          return
+        }
+
+        const currentRoom = userManager.getUserCurrentRoom(socketUser.userId)
+        if (!currentRoom) {
+          socket.emit('error', { error: 'Not in a room' })
+          return
+        }
+
+        const game = gameManager.getGame(currentRoom)
+        if (!game || !isTeamsGame(game)) {
+          socket.emit('error', { error: 'This room is not a teams game' })
+          return
+        }
+
+        game.joinTeam(socketUser.userId, data.teamId)
+        const gameState = game.getCurrentGameState(socketUser.userId)
+
+        emitTeamsUpdate(currentRoom, game)
+        socket.emit('team_joined', {
+          playerTeamId: gameState.playerTeamId,
+          teams: gameState.teams,
+          teamRequired: !gameState.playerTeamId,
+        })
       } catch (error: any) {
         socket.emit('error', { error: error.message })
       }
@@ -429,7 +546,11 @@ export function setupSocketHandlers(io: Server, gameManager: GameManager, userMa
               })
 
               // Remove user from game
+              const game = gameManager.getGame(currentRoom)
               gameManager.removeUserFromGame(socketUser.userId, currentRoom)
+              if (game) {
+                emitTeamsUpdate(currentRoom, game)
+              }
             }
 
             // Clean up the socket mapping for this user

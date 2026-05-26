@@ -2,6 +2,7 @@ import { ContextoDefaultGame } from '../game/ContextoDefaultGame'
 import { ContextoCompetitiveGame } from '../game/ContextoCompetitiveGame'
 import { ContextoBattleRoyaleGame } from '../game/ContextoBattleRoyaleGame'
 import { ContextoStopGame } from '../game/ContextoStopGame'
+import { ContextoTeamsGame } from '../game/ContextoTeamsGame'
 import { ContextoManager } from '../game/ContextoManager'
 import snowflakeGenerator from '../utils/snowflake'
 import { IGame } from '../game/interface'
@@ -20,7 +21,7 @@ export class GameManager {
     return this.contextoManager
   }
 
-  createGame(type: 'default' | 'competitive' | 'battle-royale' | 'stop', userId: string, gameIdOrDate?: number | Date): string {
+  createGame(type: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams', userId: string, gameIdOrDate?: number | Date): string {
     // Use ContextoManager to create the game directly
     const game = this.contextoManager.createNewGame(userId, type, gameIdOrDate)
     return game.id
@@ -91,7 +92,8 @@ export class GameManager {
       default: 0,
       competitive: 0,
       battleRoyale: 0,
-      stop: 0
+      stop: 0,
+      teams: 0
     }
 
     for (const game of allGames) {
@@ -101,6 +103,8 @@ export class GameManager {
         gameTypes.competitive++
       } else if (game instanceof ContextoStopGame) {
         gameTypes.stop++
+      } else if (game instanceof ContextoTeamsGame) {
+        gameTypes.teams++
       } else {
         gameTypes.default++
       }

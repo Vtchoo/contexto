@@ -150,6 +150,10 @@ const predefinedRules = {
     allowTips: false,
     allowGiveUp: false,
   },
+  'teams': {
+    allowTips: false,
+    allowGiveUp: false,
+  },
 } as const;
 
 export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClose, onCreate }) => {
@@ -231,6 +235,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
               <option value="default">Clássico</option>
               <option value="competitive">Competitivo</option>
               <option value="stop">Stop</option>
+              <option value="teams">Times</option>
               <option value="battle-royale">Battle Royale</option>
             </Select>
           </Row>

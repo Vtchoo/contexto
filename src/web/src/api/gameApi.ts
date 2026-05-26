@@ -11,7 +11,17 @@ const api = axios.create({
 
 // Types
 
-export type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop'
+export type GameMode = 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams'
+
+export interface TeamState {
+  id: string
+  name: string
+  color: string
+  players: string[]
+  guessCount: number
+  closestDistance?: number
+  won?: boolean
+}
 
 export interface Player {
   id: string
@@ -35,7 +45,7 @@ export interface Guess {
 export interface GameRoom {
   roomId: string
   gameId: number
-  type: 'default' | 'competitive' | 'battle-royale' | 'stop'
+  type: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams'
   finished: boolean
   guessCount: number
   createdAt: string
@@ -73,12 +83,13 @@ export interface RoomInfo {
   allowGiveUp: boolean
   playersProgress?: any[]
   usedWords?: number
+  teams?: TeamState[]
 }
 
 // API functions
 export const gameApi = {
   // Game management
-  createGame: async (type: 'default' | 'competitive' | 'battle-royale' | 'stop', options?: CreateGameOptions): Promise<CreateGameResponse> => {
+  createGame: async (type: 'default' | 'competitive' | 'battle-royale' | 'stop' | 'teams', options?: CreateGameOptions): Promise<CreateGameResponse> => {
     const response = await api.post('/api/game', { ...options, type })
     return response.data
   },

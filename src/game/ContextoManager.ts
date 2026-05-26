@@ -5,6 +5,7 @@ import { ContextoDefaultGame } from './ContextoDefaultGame'
 import { ContextoCompetitiveGame } from './ContextoCompetitiveGame'
 import { ContextoStopGame } from './ContextoStopGame'
 import { ContextoBattleRoyaleGame } from './ContextoBattleRoyaleGame'
+import { ContextoTeamsGame } from './ContextoTeamsGame'
 import GameApi from './gameApi'
 import { getPrefetchedGamesRepository } from '../repositories/PrefetchedGamesRepository'
 
@@ -37,7 +38,7 @@ class ContextoManager {
         return undefined
     }
 
-    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default', gameIdOrDate?: number | Date) {
+    public createNewGame(playerId: string, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' | 'teams' = 'default', gameIdOrDate?: number | Date) {
         let game: IGame
         switch (gameType) {
             case 'competitive':
@@ -48,6 +49,9 @@ class ContextoManager {
                 break
             case 'battle-royale':
                 game = new ContextoBattleRoyaleGame(playerId, this, gameIdOrDate)
+                break
+            case 'teams':
+                game = new ContextoTeamsGame(playerId, this, gameIdOrDate)
                 break
             case 'default':
             default:
@@ -275,7 +279,7 @@ class ContextoManager {
     }
 
     // Convenience method to create a game for a specific date
-    public createGameForDate(playerId: string, date: Date, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' = 'default') {
+    public createGameForDate(playerId: string, date: Date, gameType: 'default' | 'competitive' | 'stop' | 'battle-royale' | 'teams' = 'default') {
         return this.createNewGame(playerId, gameType, date)
     }
 
@@ -325,6 +329,15 @@ class ContextoManager {
         return {
             game: isBattleRoyale ? result.game as ContextoBattleRoyaleGame : null!,
             exists: isBattleRoyale
+        }
+    }
+
+    public getTeamsGameInfo(gameInstanceId: string): { game: ContextoTeamsGame; exists: boolean } {
+        const result = this.getGameInfo(gameInstanceId)
+        const isTeams = result.game instanceof ContextoTeamsGame
+        return {
+            game: isTeams ? result.game as ContextoTeamsGame : null!,
+            exists: isTeams
         }
     }
 }
